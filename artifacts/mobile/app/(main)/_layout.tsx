@@ -1,23 +1,28 @@
+import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
-
-// IMPORTANT: iOS 26 uses NativeTabs for native tabs with liquid glass support.
-// NativeTabs intentionally does NOT use custom design tokens — liquid glass
-// is a system-level appearance provided by iOS and cannot be overridden.
-// Custom brand colors are applied only on the ClassicTabLayout path (older iOS / Android / web).
 import { getGetUnreadNotificationCountQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 
+function UnreadBadge({ color: _color }: { color: string }) {
+  const { data } = useQuery(getGetUnreadNotificationCountQueryOptions());
+  const count = data?.count ?? 0;
+  if (!count) return null;
+  return (
+    <View style={[styles.badge, { position: "absolute", top: -4, right: -8 }]}>
+      <View style={styles.badgeDot} />
+    </View>
+  );
+}
+
 function NativeTabLayout() {
-  const { data: unreadCount } = useQuery(getGetUnreadNotificationCountQueryOptions());
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="map">
@@ -30,10 +35,10 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="notifications">
         <Icon sf={{ default: "bell", selected: "bell.fill" }} />
-        <Label>Notifications</Label>
+        <Label>Alerts</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
+        <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
@@ -46,48 +51,45 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const { data: unreadCount } = useQuery(getGetUnreadNotificationCountQueryOptions());
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: true,
+        headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
-          borderTopWidth: isWeb ? 1 : 0,
+          backgroundColor: isIOS ? "transparent" : colors.card,
+          borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84, paddingBottom: 34 } : {}),
+          ...(isWeb ? { height: 64 } : {}),
         },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={100}
+              intensity={95}
               tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
-          ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
-            />
           ) : null,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontFamily: "Inter_500Medium",
+          marginBottom: 4,
+        },
       }}
     >
       <Tabs.Screen
         name="map"
         options={{
           title: "Map",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="map" tintColor={color} size={24} />
+              <SymbolView name={focused ? "map.fill" : "map"} tintColor={color} size={24} />
             ) : (
-              <Feather name="map" size={22} color={color} />
+              <Ionicons name={focused ? "map" : "map-outline"} size={24} color={color} />
             ),
         }}
       />
@@ -95,24 +97,23 @@ function ClassicTabLayout() {
         name="vehicles"
         options={{
           title: "Vehicles",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="car" tintColor={color} size={24} />
+              <SymbolView name={focused ? "car.fill" : "car"} tintColor={color} size={24} />
             ) : (
-              <Feather name="truck" size={22} color={color} />
+              <Ionicons name={focused ? "car" : "car-outline"} size={24} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
-          title: "Notifications",
-          tabBarBadge: unreadCount?.count && unreadCount.count > 0 ? unreadCount.count : undefined,
-          tabBarIcon: ({ color }) =>
+          title: "Alerts",
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="bell" tintColor={color} size={24} />
+              <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={color} size={24} />
             ) : (
-              <Feather name="bell" size={22} color={color} />
+              <Ionicons name={focused ? "notifications" : "notifications-outline"} size={24} color={color} />
             ),
         }}
       />
@@ -120,11 +121,11 @@ function ClassicTabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="person.circle" tintColor={color} size={24} />
+              <SymbolView name={focused ? "person.fill" : "person"} tintColor={color} size={24} />
             ) : (
-              <Feather name="user" size={22} color={color} />
+              <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
             ),
         }}
       />
@@ -132,9 +133,19 @@ function ClassicTabLayout() {
   );
 }
 
-export default function TabLayout() {
+export default function MainTabLayout() {
   if (isLiquidGlassAvailable()) {
     return <NativeTabLayout />;
   }
   return <ClassicTabLayout />;
 }
+
+const styles = StyleSheet.create({
+  badge: {},
+  badgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+  },
+});

@@ -1,0 +1,2 @@
+- [ParkEase API hook patterns](parkease-api-hooks.md) — generated API has NO useGetXxx query hooks; use useQuery(getGetXxxQueryOptions()) pattern instead
+- [ParkEase project overview](parkease-overview.md) — stack, credentials, key decisions

@@ -5,6 +5,9 @@
     "tsBuildInfoFile": ".tsbuildinfo",
     "baseUrl": ".",
     "strict": true,
+    "jsx": "react-native",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
     "paths": {
       "@/*": [
         "./*"
