@@ -1,0 +1,270 @@
+Create a complete cross-platform mobile application (Android and iOS) for parking and vehicle management.
+
+## Application Startup Flow
+
+When the user taps the application icon:
+
+1. Display a professional splash screen with the application logo.
+2. Request permission to access the user's current location.
+3. After permission is granted, load the main application screen (Home Page).
+
+## Home Page Requirements
+
+The Home Page must contain:
+
+* An interactive map.
+* Display the user's exact current location.
+* Zoom In and Zoom Out functionality.
+* Search bar for locations, parking lots, and addresses.
+* "Change Location" button.
+* "Filter" button.
+* "Notifications" button.
+
+### Parking Visualization
+
+Parking locations must be displayed on the map.
+
+Color coding:
+
+* Green = Free parking.
+* Orange = Paid parking.
+
+If possible, the building footprint or parking area itself should be highlighted using the corresponding color.
+
+## User Roles
+
+### Super User (System Administrator)
+
+The application must contain one Super User account with unrestricted permissions.
+
+The Super User can:
+
+* Manage all users.
+* Add, edit, and delete parking locations.
+* Add, edit, and delete parking features/extras.
+* Manage notifications.
+* Manage application settings.
+* Access all administrative functions.
+* Access the AI Assistant.
+
+Generate secure default credentials:
+
+Username: superadmin
+Password: G7#Pq9!Xr2@Lm8$Vz5
+
+The password must be stored using strong hashing (bcrypt or Argon2).
+
+## Parking Management
+
+Each parking location must support:
+
+* Name
+* Address
+* GPS coordinates
+* Parking type (Free/Paid)
+* Description
+* Photo gallery
+* Parking features/extras
+
+### Parking Extras
+
+Examples:
+
+* Security guard
+* CCTV cameras
+* Barrier gate
+* Covered parking
+* Lighting
+* EV charging stations
+* Handicap access
+
+The Super User must be able to:
+
+* Add new extra categories.
+* Edit existing extras.
+* Delete extras.
+
+## User Registration
+
+The application must support account registration.
+
+Registration fields:
+
+* First Name
+* Last Name
+* Email Address
+* Phone Number
+* Password
+
+All registration data must be stored in the company's database.
+
+### Verification
+
+After successful registration:
+
+* Send either an SMS verification code or an email verification code.
+* The account remains inactive until verification succeeds.
+* After successful verification, redirect the user to the login page.
+
+## Authentication
+
+Implement:
+
+* Registration
+* Login
+* Logout
+* Forgot Password
+* Password Reset
+
+Use JWT authentication and secure session management.
+
+## User Profile
+
+Each user can:
+
+* Upload a profile photo.
+* Edit profile information.
+* Customize their profile.
+* Manage vehicles.
+
+### Vehicle Management
+
+Users can:
+
+* Add vehicles.
+* Edit vehicles.
+* Remove vehicles.
+
+Vehicle fields:
+
+* Vehicle name
+* License plate number
+* Brand
+* Model
+* Year
+* Color
+* Photo
+
+## Vehicle Location Tracking
+
+Each vehicle must have its own manually assigned location.
+
+Important:
+
+Only the user who added the vehicle may set or change that vehicle's location.
+
+Vehicle locations must be displayed on the Home Page map.
+
+## Vehicle History
+
+Every vehicle must maintain its own history stored in the database.
+
+History examples:
+
+* Location changes
+* Parking activity
+* User updates
+* Vehicle modifications
+
+Users can view the complete history of their own vehicles.
+
+## Notifications System
+
+The application must include a Notifications Center.
+
+When the Notifications button is pressed:
+
+* Open a scrollable notifications screen.
+* Display every notification generated since the user account was created.
+* Notifications should be ordered by date.
+* Support read/unread status.
+
+Each notification must be clickable and redirect the user to the related page, screen, parking location, vehicle, or action.
+
+## AI Assistant
+
+Create an AI Assistant module.
+
+Access restrictions:
+
+* Only the Super User (Administrator) can access it.
+* Regular users cannot see or use it.
+
+### AI Assistant Permissions
+
+The AI Assistant should have access to:
+
+* Application documentation
+* Configuration files
+* Database schema
+* User management data
+* Parking management data
+* Vehicle management data
+* Logs and analytics
+
+### AI Assistant Capabilities
+
+The AI Assistant should:
+
+* Help the Super User perform administrative tasks.
+* Analyze data and provide insights.
+* Assist with parking management.
+* Assist with user management.
+* Generate reports.
+* Detect anomalies and issues.
+* Suggest optimizations.
+* Search application resources and documentation.
+
+## Backend Requirements
+
+Use:
+
+* PostgreSQL database
+* REST API architecture
+* JWT Authentication
+* Role-Based Access Control (RBAC)
+* Secure password hashing (bcrypt or Argon2)
+* Email/SMS verification service
+* Audit logging
+
+## Recommended Technology Stack
+
+Frontend:
+
+* React Native with Expo
+* TypeScript
+
+Backend:
+
+* Node.js
+* Express.js
+
+Database:
+
+* PostgreSQL
+
+Maps:
+
+* Google Maps SDK or Mapbox
+
+Storage:
+
+* Cloud storage for photos
+
+Authentication:
+
+* JWT + Refresh Tokens
+
+## Security Requirements
+
+* Encrypted communication (HTTPS).
+* Secure password hashing.
+* Input validation.
+* Rate limiting.
+* Protection against SQL Injection.
+* Protection against XSS.
+* Protection against CSRF where applicable.
+* Audit logs for all administrative actions.
+* Role-based permissions for all protected resources.
+
+Generate the complete application structure, database schema, API architecture, UI screens, navigation flow, authentication system, and deployment configuration.

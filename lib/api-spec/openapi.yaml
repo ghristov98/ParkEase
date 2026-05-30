@@ -3,20 +3,33 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ParkEase - Parking and Vehicle Management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management
+  - name: parking
+    description: Parking lot management
+  - name: extras
+    description: Parking extras/features
+  - name: vehicles
+    description: Vehicle management
+  - name: notifications
+    description: Notification management
+  - name: ai
+    description: AI Assistant (super admin only)
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +37,1461 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── AUTH ───────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered, verification required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/verify:
+    post:
+      operationId: verifyEmail
+      tags: [auth]
+      summary: Verify email with code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Reset email sent if account exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Reset password with token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: New tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ─── USERS ──────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: getUsers
+      tags: [users]
+      summary: List all users (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+
+  /users/{id}:
+    get:
+      operationId: getUserById
+      tags: [users]
+      summary: Get user by ID (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /users/profile:
+    put:
+      operationId: updateProfile
+      tags: [users]
+      summary: Update own profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/profile/photo:
+    post:
+      operationId: uploadProfilePhoto
+      tags: [users]
+      summary: Upload profile photo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadResponse"
+
+  /users/stats:
+    get:
+      operationId: getUserStats
+      tags: [users]
+      summary: Get user statistics summary (super admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  # ─── PARKING ────────────────────────────────────────────────
+  /parking:
+    get:
+      operationId: getParkingLots
+      tags: [parking]
+      summary: List parking lots
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: type
+          schema:
+            $ref: "#/components/schemas/ParkingType"
+        - in: query
+          name: lat
+          schema:
+            type: number
+        - in: query
+          name: lng
+          schema:
+            type: number
+        - in: query
+          name: radius
+          schema:
+            type: number
+            description: Radius in km
+      responses:
+        "200":
+          description: List of parking lots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingLot"
+    post:
+      operationId: createParkingLot
+      tags: [parking]
+      summary: Create parking lot (super admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateParkingLotRequest"
+      responses:
+        "201":
+          description: Created parking lot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingLot"
+
+  /parking/{id}:
+    get:
+      operationId: getParkingLotById
+      tags: [parking]
+      summary: Get parking lot details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Parking lot details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingLot"
+    put:
+      operationId: updateParkingLot
+      tags: [parking]
+      summary: Update parking lot (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateParkingLotRequest"
+      responses:
+        "200":
+          description: Updated parking lot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingLot"
+    delete:
+      operationId: deleteParkingLot
+      tags: [parking]
+      summary: Delete parking lot (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /parking/{id}/photos:
+    post:
+      operationId: uploadParkingPhoto
+      tags: [parking]
+      summary: Upload photo for parking lot (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadResponse"
+
+  /parking/stats:
+    get:
+      operationId: getParkingStats
+      tags: [parking]
+      summary: Get parking statistics summary (super admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Parking statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingStats"
+
+  # ─── EXTRAS ─────────────────────────────────────────────────
+  /extras:
+    get:
+      operationId: getExtras
+      tags: [extras]
+      summary: List all parking extras
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of parking extras
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParkingExtra"
+    post:
+      operationId: createExtra
+      tags: [extras]
+      summary: Create parking extra (super admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExtraRequest"
+      responses:
+        "201":
+          description: Created extra
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingExtra"
+
+  /extras/{id}:
+    put:
+      operationId: updateExtra
+      tags: [extras]
+      summary: Update parking extra (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateExtraRequest"
+      responses:
+        "200":
+          description: Updated extra
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingExtra"
+    delete:
+      operationId: deleteExtra
+      tags: [extras]
+      summary: Delete parking extra (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── VEHICLES ───────────────────────────────────────────────
+  /vehicles:
+    get:
+      operationId: getVehicles
+      tags: [vehicles]
+      summary: Get current user's vehicles
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      summary: Add a new vehicle
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVehicleRequest"
+      responses:
+        "201":
+          description: Created vehicle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /vehicles/{id}:
+    get:
+      operationId: getVehicleById
+      tags: [vehicles]
+      summary: Get vehicle details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Vehicle details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    put:
+      operationId: updateVehicle
+      tags: [vehicles]
+      summary: Update a vehicle
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVehicleRequest"
+      responses:
+        "200":
+          description: Updated vehicle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      summary: Delete a vehicle
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /vehicles/{id}/location:
+    put:
+      operationId: updateVehicleLocation
+      tags: [vehicles]
+      summary: Set or update vehicle location (owner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleLocationRequest"
+      responses:
+        "200":
+          description: Location updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /vehicles/{id}/history:
+    get:
+      operationId: getVehicleHistory
+      tags: [vehicles]
+      summary: Get vehicle history (owner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Vehicle history events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleHistoryListResponse"
+
+  /vehicles/{id}/photo:
+    post:
+      operationId: uploadVehiclePhoto
+      tags: [vehicles]
+      summary: Upload vehicle photo
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadResponse"
+
+  /vehicles/all:
+    get:
+      operationId: getAllVehicles
+      tags: [vehicles]
+      summary: Get all users' vehicles with locations (super admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All vehicles with locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+
+  # ─── NOTIFICATIONS ──────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get current user's notifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+    post:
+      operationId: createNotification
+      tags: [notifications]
+      summary: Send a notification to user(s) (super admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationRequest"
+      responses:
+        "201":
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notifications/{id}/read:
+    put:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    put:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notifications/unread-count:
+    get:
+      operationId: getUnreadNotificationCount
+      tags: [notifications]
+      summary: Get unread notification count
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnreadCountResponse"
+
+  # ─── AI ASSISTANT ───────────────────────────────────────────
+  /ai/chat:
+    post:
+      operationId: aiChat
+      tags: [ai]
+      summary: Send message to AI assistant (super admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatRequest"
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatResponse"
+
+  /ai/history:
+    get:
+      operationId: getAiHistory
+      tags: [ai]
+      summary: Get AI chat history (super admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AiMessage"
+
+  /ai/stats:
+    get:
+      operationId: getAiStats
+      tags: [ai]
+      summary: Get app-wide analytics for AI (super admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: App statistics for AI analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppStats"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    idParam:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error, message]
+
+    PhotoUploadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required: [url]
+
+    # AUTH SCHEMAS
+    RegisterRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+          minLength: 8
+      required: [firstName, lastName, email, phone, password]
+
+    VerifyEmailRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+      required: [email, code]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required: [email]
+
+    ResetPasswordRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+      required: [token, password]
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required: [refreshToken]
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required: [accessToken, refreshToken, user]
+
+    # USER SCHEMAS
+    UserRole:
+      type: string
+      enum: [user, superadmin]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        photoUrl:
+          type: string
+          nullable: true
+        isVerified:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, firstName, lastName, email, phone, role, isVerified, isActive, createdAt]
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [users, total, page, totalPages]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        isActive:
+          type: boolean
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+
+    UserStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+        verified:
+          type: integer
+        newThisMonth:
+          type: integer
+      required: [total, active, verified, newThisMonth]
+
+    # PARKING SCHEMAS
+    ParkingType:
+      type: string
+      enum: [free, paid]
+
+    ParkingExtra:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        icon:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+      required: [id, name]
+
+    ParkingLot:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        type:
+          $ref: "#/components/schemas/ParkingType"
+        description:
+          type: string
+          nullable: true
+        photos:
+          type: array
+          items:
+            type: string
+        extras:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParkingExtra"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, address, latitude, longitude, type, photos, extras, createdAt]
+
+    CreateParkingLotRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        type:
+          $ref: "#/components/schemas/ParkingType"
+        description:
+          type: string
+        extraIds:
+          type: array
+          items:
+            type: string
+      required: [name, address, latitude, longitude, type]
+
+    UpdateParkingLotRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        type:
+          $ref: "#/components/schemas/ParkingType"
+        description:
+          type: string
+        extraIds:
+          type: array
+          items:
+            type: string
+
+    ParkingStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        free:
+          type: integer
+        paid:
+          type: integer
+      required: [total, free, paid]
+
+    CreateExtraRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        icon:
+          type: string
+        description:
+          type: string
+      required: [name]
+
+    UpdateExtraRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        icon:
+          type: string
+        description:
+          type: string
+
+    # VEHICLE SCHEMAS
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        name:
+          type: string
+        licensePlate:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        locationAddress:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, userId, name, licensePlate, brand, model, year, color, createdAt, updatedAt]
+
+    CreateVehicleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        licensePlate:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+      required: [name, licensePlate, brand, model, year, color]
+
+    UpdateVehicleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        licensePlate:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+
+    VehicleLocationRequest:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        address:
+          type: string
+      required: [latitude, longitude]
+
+    VehicleHistoryEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        vehicleId:
+          type: string
+        eventType:
+          type: string
+        description:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, vehicleId, eventType, description, createdAt]
+
+    VehicleHistoryListResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleHistoryEvent"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [events, total, page, totalPages]
+
+    # NOTIFICATION SCHEMAS
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        type:
+          type: string
+        isRead:
+          type: boolean
+        linkType:
+          type: string
+          nullable: true
+        linkId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, title, body, type, isRead, createdAt]
+
+    NotificationListResponse:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [notifications, total, page, totalPages]
+
+    CreateNotificationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        type:
+          type: string
+        userIds:
+          type: array
+          items:
+            type: string
+          description: Leave empty to send to all users
+        linkType:
+          type: string
+        linkId:
+          type: string
+      required: [title, body, type]
+
+    UnreadCountResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+      required: [count]
+
+    # AI SCHEMAS
+    AiChatRequest:
+      type: object
+      properties:
+        message:
+          type: string
+        conversationId:
+          type: string
+          nullable: true
+      required: [message]
+
+    AiChatResponse:
+      type: object
+      properties:
+        reply:
+          type: string
+        conversationId:
+          type: string
+      required: [reply, conversationId]
+
+    AiMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, conversationId, role, content, createdAt]
+
+    AppStats:
+      type: object
+      properties:
+        users:
+          $ref: "#/components/schemas/UserStats"
+        parking:
+          $ref: "#/components/schemas/ParkingStats"
+        vehicles:
+          type: object
+          properties:
+            total:
+              type: integer
+            withLocation:
+              type: integer
+          required: [total, withLocation]
+        notifications:
+          type: object
+          properties:
+            total:
+              type: integer
+            unread:
+              type: integer
+          required: [total, unread]
+      required: [users, parking, vehicles, notifications]
