@@ -14,9 +14,18 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "ParkEase uses your location to show nearby parking lots and update your vehicle's position.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "ParkEase uses your location to show nearby parking lots and update your vehicle's position."
+      }
     },
-    "android": {},
+    "android": {
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -28,7 +37,13 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ParkEase uses your location to show nearby parking lots and update your vehicle's position."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -46,16 +46,26 @@ export default function MapScreen() {
 
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationPermission(status === "granted");
-      if (status === "granted") {
-        const location = await Location.getCurrentPositionAsync({});
-        setRegion({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        });
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        setLocationPermission(status === "granted");
+        if (status === "granted") {
+          try {
+            const location = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            setRegion({
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            });
+          } catch {
+            // Location hardware unavailable (simulator/web) — keep default region
+          }
+        }
+      } catch {
+        // Permission API unavailable — keep default region
       }
     })();
   }, []);
