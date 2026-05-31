@@ -22,6 +22,13 @@ export default function Root({ children }: PropsWithChildren) {
                 font-style: normal;
                 font-display: block;
               }
+              @font-face {
+                font-family: 'Feather';
+                src: url('/fonts/Feather.ttf') format('truetype');
+                font-weight: normal;
+                font-style: normal;
+                font-display: block;
+              }
               * { box-sizing: border-box; }
               html, body, #root { height: 100%; }
               body { margin: 0; background-color: #F5F7FF; }
