@@ -15,10 +15,6 @@ import colors from "@/constants/colors";
  * device's appearance setting.
  */
 export function useColors() {
-  const scheme = useColorScheme();
-  const palette =
-    scheme === "dark" && "dark" in colors
-      ? (colors as any).dark
-      : colors.light;
-  return { ...palette, radius: colors.radius };
+  useColorScheme(); // keep the import used
+  return { ...colors.light, radius: colors.radius };
 }
