@@ -43,10 +43,7 @@ export default function RegisterScreen() {
       await registerMutation.mutateAsync({
         data: { firstName, lastName, email, phone, password },
       });
-      router.push({
-        pathname: "/(auth)/verify",
-        params: { email },
-      });
+      router.replace("/(auth)/login");
     } catch (err: any) {
       setError(err.message || "Registration failed");
     }

@@ -22,17 +22,13 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
   await db.insert(usersTable).values({
     firstName, lastName, email, phone, passwordHash,
-    verificationCode: code,
-    verificationExpiresAt: expiresAt,
+    isVerified: true,
   });
 
-  req.log.info({ email, code }, "Verification code generated");
-  res.status(201).json({ message: `Registration successful. Verification code: ${code} (check server logs in dev)` });
+  res.status(201).json({ message: "Registration successful. You can now sign in." });
 });
 
 router.post("/auth/verify", async (req, res): Promise<void> => {
@@ -65,10 +61,6 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (!user || !await bcrypt.compare(password, user.passwordHash)) {
     res.status(401).json({ error: "invalid_credentials", message: "Invalid email or password" });
-    return;
-  }
-  if (!user.isVerified) {
-    res.status(401).json({ error: "not_verified", message: "Please verify your email first" });
     return;
   }
   if (!user.isActive) {
