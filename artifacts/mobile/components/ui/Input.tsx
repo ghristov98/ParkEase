@@ -79,11 +79,9 @@ export function Input({
             onPress={() => setShowPassword(!showPassword)}
             style={styles.rightIcon}
           >
-            <Ionicons
-              name={showPassword ? "eye-off-outline" : "eye-outline"}
-              size={20}
-              color={colors.mutedForeground}
-            />
+            <Text style={styles.leftIconText}>
+              {showPassword ? "🙈" : "👁️"}
+            </Text>
           </TouchableOpacity>
         ) : rightIcon ? (
           <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon}>
