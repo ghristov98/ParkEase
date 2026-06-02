@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+
 import { getGetNotificationsQueryOptions, useMarkAllNotificationsRead, useMarkNotificationRead } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
@@ -106,7 +106,7 @@ export default function NotificationsScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
-              <Ionicons name="notifications-outline" size={48} color={colors.mutedForeground} />
+              <Text style={styles.emptyEmoji}>🔔</Text>
             </View>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No notifications</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
@@ -180,6 +180,9 @@ const styles = StyleSheet.create({
     marginTop: 80,
     alignItems: "center",
     paddingHorizontal: 40,
+  },
+  emptyEmoji: {
+    fontSize: 40,
   },
   emptyIcon: {
     width: 80,
