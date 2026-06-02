@@ -1,11 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { getGetUnreadNotificationCountQueryOptions } from "@workspace/api-client-react";
@@ -85,11 +84,11 @@ function ClassicTabLayout() {
         name="map"
         options={{
           title: "Map",
-          tabBarIcon: ({ color, focused }) =>
+          tabBarIcon: ({ focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? "map.fill" : "map"} tintColor={color} size={24} />
+              <SymbolView name={focused ? "map.fill" : "map"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
             ) : (
-              <Ionicons name={focused ? "map" : "map-outline"} size={24} color={color} />
+              <Text style={styles.tabEmoji}>🗺️</Text>
             ),
         }}
       />
@@ -97,11 +96,11 @@ function ClassicTabLayout() {
         name="vehicles"
         options={{
           title: "Vehicles",
-          tabBarIcon: ({ color, focused }) =>
+          tabBarIcon: ({ focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? "car.fill" : "car"} tintColor={color} size={24} />
+              <SymbolView name={focused ? "car.fill" : "car"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
             ) : (
-              <Ionicons name={focused ? "car" : "car-outline"} size={24} color={color} />
+              <Text style={styles.tabEmoji}>🚗</Text>
             ),
         }}
       />
@@ -109,11 +108,11 @@ function ClassicTabLayout() {
         name="notifications"
         options={{
           title: "Alerts",
-          tabBarIcon: ({ color, focused }) =>
+          tabBarIcon: ({ focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={color} size={24} />
+              <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
             ) : (
-              <Ionicons name={focused ? "notifications" : "notifications-outline"} size={24} color={color} />
+              <Text style={styles.tabEmoji}>🔔</Text>
             ),
         }}
       />
@@ -121,11 +120,11 @@ function ClassicTabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, focused }) =>
+          tabBarIcon: ({ focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? "person.fill" : "person"} tintColor={color} size={24} />
+              <SymbolView name={focused ? "person.fill" : "person"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
             ) : (
-              <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+              <Text style={styles.tabEmoji}>👤</Text>
             ),
         }}
       />
@@ -141,6 +140,9 @@ export default function MainTabLayout() {
 }
 
 const styles = StyleSheet.create({
+  tabEmoji: {
+    fontSize: 22,
+  },
   badge: {},
   badgeDot: {
     width: 8,
