@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+
 import { useUpdateProfile } from "@workspace/api-client-react";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -109,7 +109,7 @@ export default function ProfileScreen() {
               </View>
             )}
             <View style={[styles.editBadge, { backgroundColor: colors.card }]}>
-              <Ionicons name="camera" size={16} color={colors.primary} />
+              <Text style={styles.cameraEmoji}>📷</Text>
             </View>
           </TouchableOpacity>
           <Text style={[styles.userName, { color: colors.foreground }]}>
@@ -156,17 +156,17 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.infoList}>
               <View style={styles.infoItem}>
-                <Ionicons name="call-outline" size={20} color={colors.mutedForeground} />
+                <Text style={styles.infoEmoji}>📞</Text>
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
                   {user?.phone || "No phone added"}
                 </Text>
               </View>
               <View style={styles.infoItem}>
-                <Ionicons name="mail-outline" size={20} color={colors.mutedForeground} />
+                <Text style={styles.infoEmoji}>✉️</Text>
                 <Text style={[styles.infoText, { color: colors.foreground }]}>{user?.email}</Text>
               </View>
               <View style={styles.infoItem}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={colors.mutedForeground} />
+                <Text style={styles.infoEmoji}>🛡️</Text>
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
                   Status: {user?.isVerified ? "Verified" : "Unverified"}
                 </Text>
@@ -183,7 +183,7 @@ export default function ProfileScreen() {
                   <Text style={styles.adminTitle}>Admin Dashboard</Text>
                   <Text style={styles.adminSubtitle}>Manage users, lots and more</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={24} color="white" />
+                <Text style={styles.arrowEmoji}>→</Text>
               </View>
             </Card>
           </TouchableOpacity>
@@ -240,6 +240,19 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "700",
     color: "white",
+  },
+  cameraEmoji: {
+    fontSize: 14,
+  },
+  infoEmoji: {
+    fontSize: 18,
+    width: 24,
+    textAlign: "center",
+  },
+  arrowEmoji: {
+    fontSize: 20,
+    color: "white",
+    fontWeight: "600",
   },
   editBadge: {
     position: "absolute",
