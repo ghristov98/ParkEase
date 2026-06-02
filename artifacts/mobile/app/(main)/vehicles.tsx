@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { getGetVehiclesQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -12,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Card } from "@/components/ui/Card";
@@ -47,7 +47,7 @@ export default function VehiclesScreen() {
                   {item.photoUrl ? (
                     <Image source={{ uri: item.photoUrl }} style={styles.photo} />
                   ) : (
-                    <Ionicons name="car" size={32} color={colors.mutedForeground} />
+                    <Text style={styles.vehicleEmoji}>🚘</Text>
                   )}
                 </View>
                 <View style={styles.details}>
@@ -57,7 +57,7 @@ export default function VehiclesScreen() {
                     {item.brand} {item.model} • {item.year}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+                <Text style={styles.chevronEmoji}>›</Text>
               </View>
             </Card>
           </TouchableOpacity>
@@ -65,7 +65,7 @@ export default function VehiclesScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
-              <Ionicons name="car-outline" size={48} color={colors.mutedForeground} />
+              <Text style={styles.emptyEmoji}>🚘</Text>
             </View>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No vehicles added</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
@@ -85,7 +85,7 @@ export default function VehiclesScreen() {
         style={[styles.fab, { backgroundColor: colors.primary, bottom: 100 + insets.bottom }]}
         onPress={() => router.push("/vehicle/add")}
       >
-        <Ionicons name="add" size={30} color="white" />
+        <Text style={styles.fabEmoji}>➕</Text>
       </TouchableOpacity>
     </View>
   );
@@ -167,6 +167,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 32,
     lineHeight: 24,
+  },
+  vehicleEmoji: {
+    fontSize: 28,
+  },
+  emptyEmoji: {
+    fontSize: 44,
+  },
+  chevronEmoji: {
+    fontSize: 24,
+    color: "#6B7399",
+  },
+  fabEmoji: {
+    fontSize: 22,
   },
   addButton: {
     paddingHorizontal: 32,
