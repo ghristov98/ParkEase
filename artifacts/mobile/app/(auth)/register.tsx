@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { useRegister } from "@workspace/api-client-react";
 
 import { Button } from "@/components/ui/Button";
@@ -56,7 +55,7 @@ export default function RegisterScreen() {
     >
       <View style={[styles.headerActions, { top: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.foreground} />
+          <Text style={[styles.backEmoji, { color: colors.foreground }]}>←</Text>
         </TouchableOpacity>
       </View>
 
@@ -75,7 +74,7 @@ export default function RegisterScreen() {
         <View style={styles.form}>
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: colors.destructive + "10" }]}>
-              <Ionicons name="alert-circle" size={20} color={colors.destructive} />
+              <Text style={styles.alertEmoji}>⚠️</Text>
               <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
           )}
@@ -107,7 +106,7 @@ export default function RegisterScreen() {
             onChangeText={(text) => setForm({ ...form, email: text })}
             keyboardType="email-address"
             autoCapitalize="none"
-            leftIcon="mail-outline"
+            leftIconText="✉️"
           />
 
           <Input
@@ -116,7 +115,7 @@ export default function RegisterScreen() {
             value={form.phone}
             onChangeText={(text) => setForm({ ...form, phone: text })}
             keyboardType="phone-pad"
-            leftIcon="call-outline"
+            leftIconText="📞"
           />
 
           <Input
@@ -125,7 +124,7 @@ export default function RegisterScreen() {
             value={form.password}
             onChangeText={(text) => setForm({ ...form, password: text })}
             secureTextEntry
-            leftIcon="lock-closed-outline"
+            leftIconText="🔒"
           />
 
           <Button
@@ -155,6 +154,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     zIndex: 10,
+  },
+  backEmoji: {
+    fontSize: 22,
+    fontWeight: "600",
+  },
+  alertEmoji: {
+    fontSize: 18,
   },
   backButton: {
     width: 40,

@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useCreateVehicle } from "@workspace/api-client-react";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -97,7 +96,7 @@ export default function AddVehicleScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.foreground} />
+          <Text style={[styles.backEmoji, { color: colors.foreground }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.foreground }]}>Add Vehicle</Text>
         <View style={{ width: 40 }} />
@@ -109,7 +108,7 @@ export default function AddVehicleScreen() {
             <Image source={{ uri: photoUri }} style={styles.photo} />
           ) : (
             <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Ionicons name="camera-outline" size={40} color={colors.mutedForeground} />
+              <Text style={styles.cameraEmoji}>📷</Text>
               <Text style={[styles.photoText, { color: colors.mutedForeground }]}>Add Vehicle Photo</Text>
             </View>
           )}
@@ -223,6 +222,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+  },
+  backEmoji: {
+    fontSize: 22,
+    fontWeight: "600",
+  },
+  cameraEmoji: {
+    fontSize: 36,
   },
   photoText: {
     fontSize: 14,

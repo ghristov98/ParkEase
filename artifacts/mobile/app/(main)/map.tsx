@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { getGetParkingLotsQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
@@ -135,7 +134,7 @@ export default function MapScreen() {
                 },
               ]}
             >
-              <Ionicons name="car" size={16} color="white" />
+              <Text style={styles.markerEmoji}>🚗</Text>
             </View>
           </Marker>
         ))}
@@ -169,7 +168,7 @@ export default function MapScreen() {
               onPress={() => setSelectedLot(null)}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={20} color={colors.mutedForeground} />
+              <Text style={[styles.closeEmoji, { color: colors.mutedForeground }]}>✕</Text>
             </TouchableOpacity>
             <View style={{ padding: 16 }}>
               <View style={styles.lotHeader}>
@@ -189,7 +188,7 @@ export default function MapScreen() {
                 onPress={() => router.push(`/parking/${selectedLot.id}`)}
               >
                 <Text style={styles.detailsButtonText}>View Details</Text>
-                <Ionicons name="arrow-forward" size={18} color="white" />
+                <Text style={styles.arrowEmoji}>→</Text>
               </TouchableOpacity>
             </View>
           </Card>
@@ -201,7 +200,7 @@ export default function MapScreen() {
           style={[styles.adminFab, { bottom: 100 + insets.bottom, backgroundColor: colors.primary }]}
           onPress={() => router.push("/admin")}
         >
-          <Ionicons name="settings-outline" size={24} color="white" />
+          <Text style={styles.fabEmoji}>⚙️</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -298,6 +297,21 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "600",
     fontSize: 16,
+  },
+  markerEmoji: {
+    fontSize: 14,
+  },
+  closeEmoji: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  arrowEmoji: {
+    fontSize: 16,
+    color: "white",
+    fontWeight: "600",
+  },
+  fabEmoji: {
+    fontSize: 22,
   },
   adminFab: {
     position: "absolute",

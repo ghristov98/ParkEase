@@ -12,8 +12,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -75,7 +73,7 @@ export default function LoginScreen() {
         <View style={styles.form}>
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: colors.destructive + "10" }]}>
-              <Ionicons name="alert-circle" size={20} color={colors.destructive} />
+              <Text style={[styles.alertEmoji, { color: colors.destructive }]}>⚠️</Text>
               <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
           )}
@@ -176,6 +174,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
     gap: 8,
+  },
+  alertEmoji: {
+    fontSize: 18,
   },
   errorText: {
     fontSize: 14,

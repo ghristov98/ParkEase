@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { getGetParkingLotByIdQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -56,14 +55,14 @@ export default function ParkingLotDetails() {
             </ScrollView>
           ) : (
             <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Ionicons name="image-outline" size={64} color={colors.mutedForeground} />
+              <Text style={styles.imageEmoji}>🖼️</Text>
             </View>
           )}
           <TouchableOpacity
             style={[styles.backButton, { top: insets.top + 10 }]}
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Text style={styles.backEmoji}>←</Text>
           </TouchableOpacity>
         </View>
 
@@ -72,7 +71,7 @@ export default function ParkingLotDetails() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.name, { color: colors.foreground }]}>{lot.name}</Text>
               <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color={colors.mutedForeground} />
+                <Text style={styles.locationEmoji}>📍</Text>
                 <Text style={[styles.address, { color: colors.mutedForeground }]}>{lot.address}</Text>
               </View>
             </View>
@@ -122,7 +121,7 @@ export default function ParkingLotDetails() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.extrasList}>
                 {lot.extras.map((extra) => (
                   <View key={extra.id} style={[styles.extraChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Ionicons name={(extra.icon as any) || "star"} size={16} color={colors.primary} />
+                    <Text style={styles.extraEmoji}>⭐</Text>
                     <Text style={[styles.extraText, { color: colors.foreground }]}>{extra.name}</Text>
                   </View>
                 ))}
@@ -162,6 +161,20 @@ const styles = StyleSheet.create({
   photo: {
     width: 400, // Should be screen width, but relative is hard in static
     height: 300,
+  },
+  imageEmoji: {
+    fontSize: 56,
+  },
+  backEmoji: {
+    fontSize: 22,
+    color: "white",
+    fontWeight: "600",
+  },
+  locationEmoji: {
+    fontSize: 14,
+  },
+  extraEmoji: {
+    fontSize: 14,
   },
   photoPlaceholder: {
     flex: 1,

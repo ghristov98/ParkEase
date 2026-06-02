@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { getGetParkingStatsQueryOptions, getGetUserStatsQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -26,10 +25,10 @@ export default function AdminDashboard() {
   if (userLoading || parkingLoading) return <LoadingScreen />;
 
   const statCards = [
-    { label: "Total Users", value: userStats?.total || 0, icon: "people", color: "#3B82F6" },
-    { label: "Active Users", value: userStats?.active || 0, icon: "person-add", color: "#10B981" },
-    { label: "Parking Lots", value: parkingStats?.total || 0, icon: "car", color: "#F59E0B" },
-    { label: "Free Lots", value: parkingStats?.free || 0, icon: "leaf", color: "#22C55E" },
+    { label: "Total Users", value: userStats?.total || 0, emoji: "👥", color: "#3B82F6" },
+    { label: "Active Users", value: userStats?.active || 0, emoji: "✅", color: "#10B981" },
+    { label: "Parking Lots", value: parkingStats?.total || 0, emoji: "🚗", color: "#F59E0B" },
+    { label: "Free Lots", value: parkingStats?.free || 0, emoji: "🌿", color: "#22C55E" },
   ];
 
   return (
@@ -41,7 +40,7 @@ export default function AdminDashboard() {
         {statCards.map((stat, i) => (
           <Card key={i} style={styles.statCard as any}>
             <View style={[styles.iconContainer, { backgroundColor: stat.color + "20" }]}>
-              <Ionicons name={stat.icon as any} size={24} color={stat.color} />
+              <Text style={styles.statEmoji}>{stat.emoji}</Text>
             </View>
             <Text style={[styles.statValue, { color: colors.foreground }]}>{stat.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
@@ -56,10 +55,10 @@ export default function AdminDashboard() {
           <Card>
             <View style={styles.actionContent}>
               <View style={styles.actionInfo}>
-                <Ionicons name="people-outline" size={24} color={colors.primary} />
+                <Text style={styles.actionEmoji}>👥</Text>
                 <Text style={[styles.actionText, { color: colors.foreground }]}>Manage Users</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+              <Text style={[styles.chevronEmoji, { color: colors.mutedForeground }]}>›</Text>
             </View>
           </Card>
         </TouchableOpacity>
@@ -68,10 +67,10 @@ export default function AdminDashboard() {
           <Card>
             <View style={styles.actionContent}>
               <View style={styles.actionInfo}>
-                <Ionicons name="map-outline" size={24} color={colors.primary} />
+                <Text style={styles.actionEmoji}>🗺️</Text>
                 <Text style={[styles.actionText, { color: colors.foreground }]}>Manage Parking Lots</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+              <Text style={[styles.chevronEmoji, { color: colors.mutedForeground }]}>›</Text>
             </View>
           </Card>
         </TouchableOpacity>
@@ -80,10 +79,10 @@ export default function AdminDashboard() {
           <Card>
             <View style={styles.actionContent}>
               <View style={styles.actionInfo}>
-                <Ionicons name="send-outline" size={24} color={colors.primary} />
+                <Text style={styles.actionEmoji}>📢</Text>
                 <Text style={[styles.actionText, { color: colors.foreground }]}>Send Global Notification</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+              <Text style={[styles.chevronEmoji, { color: colors.mutedForeground }]}>›</Text>
             </View>
           </Card>
         </TouchableOpacity>
@@ -125,6 +124,16 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 13,
     fontWeight: "500",
+  },
+  statEmoji: {
+    fontSize: 22,
+  },
+  actionEmoji: {
+    fontSize: 22,
+  },
+  chevronEmoji: {
+    fontSize: 22,
+    fontWeight: "600",
   },
   actions: {
     gap: 12,

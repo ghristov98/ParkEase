@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import {
   useDeleteVehicle,
   useUpdateVehicle,
@@ -181,17 +180,17 @@ export default function VehicleDetails() {
             <Image source={{ uri: vehicle.photoUrl }} style={styles.photo} />
           ) : (
             <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Ionicons name="car" size={64} color={colors.mutedForeground} />
+              <Text style={styles.carEmoji}>🚗</Text>
             </View>
           )}
           <TouchableOpacity
             style={[styles.backButton, { top: insets.top + 10 }]}
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Text style={styles.backEmoji}>←</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.cameraIcon} onPress={changePhoto}>
-            <Ionicons name="camera" size={20} color="white" />
+            <Text style={styles.cameraEmoji}>📷</Text>
           </TouchableOpacity>
         </View>
 
@@ -203,7 +202,7 @@ export default function VehicleDetails() {
                 <Text style={[styles.plate, { color: colors.primary }]}>{vehicle.licensePlate}</Text>
               </View>
               <TouchableOpacity onPress={() => setIsEditing(!isEditing)}>
-                <Ionicons name={isEditing ? "close" : "create-outline"} size={24} color={colors.primary} />
+                <Text style={[styles.editEmoji, { color: colors.primary }]}>{isEditing ? "✕" : "✏️"}</Text>
               </TouchableOpacity>
             </View>
 
@@ -292,6 +291,20 @@ const styles = StyleSheet.create({
   photo: {
     width: "100%",
     height: "100%",
+  },
+  carEmoji: {
+    fontSize: 56,
+  },
+  backEmoji: {
+    fontSize: 22,
+    color: "white",
+    fontWeight: "600",
+  },
+  cameraEmoji: {
+    fontSize: 18,
+  },
+  editEmoji: {
+    fontSize: 22,
   },
   photoPlaceholder: {
     flex: 1,

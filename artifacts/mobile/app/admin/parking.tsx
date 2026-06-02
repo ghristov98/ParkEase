@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import {
   useCreateParkingLot,
   useDeleteParkingLot,
@@ -129,10 +128,10 @@ export default function AdminParking() {
               </View>
               <View style={styles.actions}>
                 <TouchableOpacity onPress={() => handleOpenEdit(item)}>
-                  <Ionicons name="create-outline" size={22} color={colors.primary} />
+                  <Text style={[styles.actionEmoji, { color: colors.primary }]}>✏️</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                  <Ionicons name="trash-outline" size={22} color={colors.destructive} />
+                  <Text style={[styles.actionEmoji, { color: colors.destructive }]}>🗑️</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -147,7 +146,7 @@ export default function AdminParking() {
               {editingLot ? "Edit Parking Lot" : "Add Parking Lot"}
             </Text>
             <TouchableOpacity onPress={() => setIsModalOpen(false)}>
-              <Ionicons name="close" size={24} color={colors.foreground} />
+              <Text style={[styles.closeEmoji, { color: colors.foreground }]}>✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView style={{ padding: 20 }}>
@@ -182,6 +181,13 @@ export default function AdminParking() {
 }
 
 const styles = StyleSheet.create({
+  actionEmoji: {
+    fontSize: 20,
+  },
+  closeEmoji: {
+    fontSize: 22,
+    fontWeight: "600",
+  },
   container: { flex: 1 },
   header: { padding: 16 },
   list: { padding: 16, gap: 12 },

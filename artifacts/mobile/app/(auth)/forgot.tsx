@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { useForgotPassword } from "@workspace/api-client-react";
 
 import { Button } from "@/components/ui/Button";
@@ -50,7 +49,7 @@ export default function ForgotPasswordScreen() {
     >
       <View style={[styles.headerActions, { top: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.foreground} />
+          <Text style={[styles.backEmoji, { color: colors.foreground }]}>←</Text>
         </TouchableOpacity>
       </View>
 
@@ -66,7 +65,7 @@ export default function ForgotPasswordScreen() {
         {isSuccess ? (
           <View style={styles.successContainer}>
             <View style={[styles.successBadge, { backgroundColor: "#DCFCE7" }]}>
-              <Ionicons name="checkmark-circle" size={48} color="#166534" />
+              <Text style={styles.checkEmoji}>✅</Text>
             </View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Instructions Sent!</Text>
             <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
@@ -89,7 +88,7 @@ export default function ForgotPasswordScreen() {
 
             {error && (
               <View style={[styles.errorBanner, { backgroundColor: colors.destructive + "10" }]}>
-                <Ionicons name="alert-circle" size={20} color={colors.destructive} />
+                <Text style={styles.alertEmoji}>⚠️</Text>
                 <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
               </View>
             )}
@@ -101,7 +100,7 @@ export default function ForgotPasswordScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              leftIcon="mail-outline"
+              leftIconText="✉️"
             />
 
             <Button
@@ -123,6 +122,16 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     zIndex: 10,
+  },
+  backEmoji: {
+    fontSize: 22,
+    fontWeight: "600",
+  },
+  checkEmoji: {
+    fontSize: 48,
+  },
+  alertEmoji: {
+    fontSize: 18,
   },
   backButton: {
     width: 40,

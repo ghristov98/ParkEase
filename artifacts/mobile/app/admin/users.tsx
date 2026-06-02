@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { getGetUsersQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
@@ -31,7 +30,7 @@ export default function AdminUsers() {
           placeholder="Search users..."
           value={search}
           onChangeText={setSearch}
-          leftIcon="search-outline"
+          leftIconText="🔍"
         />
       </View>
 
