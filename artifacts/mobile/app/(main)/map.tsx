@@ -79,7 +79,7 @@ export default function MapScreen() {
             placeholder="Search parking lots..."
             value={search}
             onChangeText={setSearch}
-            leftIcon="search-outline"
+            leftIconText="🔍"
           />
         </View>
         <FlatList
@@ -146,7 +146,7 @@ export default function MapScreen() {
           placeholder="Search locations..."
           value={search}
           onChangeText={setSearch}
-          leftIcon="search-outline"
+          leftIconText="🔍"
           style={styles.searchInput}
         />
       </View>
