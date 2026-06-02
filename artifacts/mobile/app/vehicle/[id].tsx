@@ -243,7 +243,7 @@ export default function VehicleDetails() {
             variant="secondary"
             title="Update Current Location"
             onPress={updateLocation}
-            icon="location-outline"
+            icon="📍"
             fullWidth
             style={styles.locationButton}
             loading={updateLocationMutation.isPending}
@@ -270,7 +270,7 @@ export default function VehicleDetails() {
             variant="destructive"
             title="Delete Vehicle"
             onPress={handleDelete}
-            icon="trash-outline"
+            icon="🗑️"
             fullWidth
             style={styles.deleteButton}
           />

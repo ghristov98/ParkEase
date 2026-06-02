@@ -193,7 +193,7 @@ export default function ProfileScreen() {
           variant="outline"
           title="Sign Out"
           onPress={logout}
-          icon="log-out-outline"
+          icon="🚪"
           style={styles.signOutButton}
           fullWidth
         />

@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
@@ -20,7 +19,7 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: string;
   style?: ViewStyle;
 }
 
@@ -75,6 +74,7 @@ export function Button({
   const height = size === "sm" ? 36 : size === "md" ? 48 : 56;
   const paddingHorizontal = size === "sm" ? 12 : 24;
   const fontSize = size === "sm" ? 14 : 16;
+  const iconSize = size === "sm" ? 16 : 18;
 
   const content = (
     <View style={styles.content}>
@@ -83,12 +83,7 @@ export function Button({
       ) : (
         <>
           {icon && (
-            <Ionicons
-              name={icon}
-              size={size === "sm" ? 18 : 20}
-              color={getTextColor()}
-              style={styles.icon}
-            />
+            <Text style={[styles.icon, { fontSize: iconSize }]}>{icon}</Text>
           )}
           <Text
             style={[

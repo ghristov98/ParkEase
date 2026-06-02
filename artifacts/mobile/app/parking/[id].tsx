@@ -139,7 +139,7 @@ export default function ParkingLotDetails() {
           <Button
             title="Get Directions"
             onPress={openInMaps}
-            icon="navigate-outline"
+            icon="🧭"
             fullWidth
             style={styles.directionsButton}
           />

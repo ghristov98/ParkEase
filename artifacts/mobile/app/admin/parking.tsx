@@ -111,7 +111,7 @@ export default function AdminParking() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Button title="Add Parking Lot" onPress={handleOpenAdd} icon="add" fullWidth />
+        <Button title="Add Parking Lot" onPress={handleOpenAdd} icon="➕" fullWidth />
       </View>
 
       <FlatList
