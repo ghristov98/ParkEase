@@ -15,6 +15,7 @@ interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   leftIcon?: keyof typeof Ionicons.glyphMap;
+  leftIconText?: string;
   rightIcon?: keyof typeof Ionicons.glyphMap;
   onRightIconPress?: () => void;
   secureTextEntry?: boolean;
@@ -24,6 +25,7 @@ export function Input({
   label,
   error,
   leftIcon,
+  leftIconText,
   rightIcon,
   onRightIconPress,
   secureTextEntry,
@@ -49,14 +51,16 @@ export function Input({
           },
         ]}
       >
-        {leftIcon && (
+        {leftIconText ? (
+          <Text style={styles.leftIconText}>{leftIconText}</Text>
+        ) : leftIcon ? (
           <Ionicons
             name={leftIcon}
             size={20}
             color={isFocused ? colors.primary : colors.mutedForeground}
             style={styles.leftIcon}
           />
-        )}
+        ) : null}
         <TextInput
           style={[
             styles.input,
@@ -118,6 +122,11 @@ const styles = StyleSheet.create({
   },
   leftIcon: {
     marginRight: 10,
+  },
+  leftIconText: {
+    fontSize: 18,
+    marginRight: 10,
+    lineHeight: 22,
   },
   rightIcon: {
     marginLeft: 10,

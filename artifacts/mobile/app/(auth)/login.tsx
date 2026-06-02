@@ -87,7 +87,7 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            leftIcon="mail-outline"
+            leftIconText="✉️"
           />
 
           <Input
@@ -96,7 +96,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            leftIcon="lock-closed-outline"
+            leftIconText="🔒"
           />
 
           <TouchableOpacity
