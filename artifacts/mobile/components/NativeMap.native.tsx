@@ -1,1 +1,1 @@
-export { default as MapView, Marker } from "react-native-maps";
+export { default as MapView, Marker, Polygon } from "react-native-maps";

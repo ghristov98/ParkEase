@@ -7,9 +7,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   FlatList,
   Image,
   Modal,
@@ -20,8 +21,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { MapView, Marker } from "@/components/NativeMap";
+import { MapView, Marker, Polygon } from "@/components/NativeMap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { checkZone, getZonePolygons, ZoneResult } from "@/services/ZoneService";
+import LocationWatcher from "@/services/LocationWatcher";
 
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -86,6 +89,8 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+const ZONE_POLYGONS = getZonePolygons();
+
 export default function MapScreen() {
   const [region, setRegion] = useState(INITIAL_REGION);
   const [search, setSearch] = useState("");
@@ -95,6 +100,9 @@ export default function MapScreen() {
   const [addForm, setAddForm] = useState<AddForm>(DEFAULT_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [zoneResult, setZoneResult] = useState<ZoneResult>({ zone: null });
+  const [showZones, setShowZones] = useState(true);
+  const bannerAnim = useRef(new Animated.Value(0)).current;
 
   const { user, accessToken } = useAuth();
   const colors = useColors();
@@ -122,11 +130,36 @@ export default function MapScreen() {
               latitudeDelta: 0.05,
               longitudeDelta: 0.05,
             });
+            const initial = checkZone(location.coords.latitude, location.coords.longitude);
+            setZoneResult(initial);
           } catch { /* keep default */ }
         }
       } catch { /* keep default */ }
     })();
   }, []);
+
+  // Subscribe to live GPS zone updates
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const watcher = LocationWatcher.getInstance();
+    const unsub = watcher.subscribe((result) => {
+      setZoneResult(result);
+    });
+    watcher.start();
+    return () => {
+      unsub();
+    };
+  }, []);
+
+  // Animate zone banner in/out when zone changes
+  useEffect(() => {
+    Animated.spring(bannerAnim, {
+      toValue: zoneResult.zone ? 1 : 0,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 12,
+    }).start();
+  }, [zoneResult.zone]);
 
   const nearbyLot = longPressCoord
     ? (parkingLots ?? []).find(
@@ -274,6 +307,28 @@ export default function MapScreen() {
         showsUserLocation={!!locationPermission}
         onLongPress={handleLongPress}
       >
+        {/* Blue Zone polygons */}
+        {showZones && ZONE_POLYGONS.blue.map((coords, i) => (
+          <Polygon
+            key={`blue-${i}`}
+            coordinates={coords}
+            fillColor="rgba(59,107,245,0.18)"
+            strokeColor="rgba(14,75,241,0.7)"
+            strokeWidth={2}
+          />
+        ))}
+
+        {/* Green Zone polygons */}
+        {showZones && ZONE_POLYGONS.green.map((coords, i) => (
+          <Polygon
+            key={`green-${i}`}
+            coordinates={coords}
+            fillColor="rgba(34,197,94,0.13)"
+            strokeColor="rgba(34,197,94,0.7)"
+            strokeWidth={2}
+          />
+        ))}
+
         {parkingLots?.map((lot) => {
           const mainPhoto = lot.photos && lot.photos.length > 0
             ? lot.photos[Math.min((lot as any).mainPhotoIndex ?? 0, lot.photos.length - 1)]
@@ -305,9 +360,46 @@ export default function MapScreen() {
         <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIconText="🔍" style={styles.searchInput} />
       </View>
 
+      {/* Zone banner — slides in when user is in a zone */}
+      <Animated.View
+        style={[
+          styles.zoneBanner,
+          { top: insets.top + 68 },
+          {
+            opacity: bannerAnim,
+            transform: [{ translateY: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+          },
+          zoneResult.zone === "blue"
+            ? styles.zoneBannerBlue
+            : styles.zoneBannerGreen,
+        ]}
+        pointerEvents="none"
+      >
+        <Text style={styles.zoneBannerEmoji}>
+          {zoneResult.zone === "blue" ? "🔵" : "🟢"}
+        </Text>
+        <View>
+          <Text style={styles.zoneBannerTitle}>
+            {zoneResult.zone === "blue"
+              ? "You are in the Blue Zone"
+              : "You are in the Green Zone"}
+          </Text>
+          <Text style={styles.zoneBannerSub}>
+            {zoneResult.smsCode
+              ? `SMS to ${zoneResult.smsCode} · ${zoneResult.hourlyRate?.toFixed(2)} BGN/hr`
+              : "Paid parking applies"}
+          </Text>
+        </View>
+      </Animated.View>
+
       <Card style={{ ...styles.legend, top: insets.top + 80 }}>
         <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.parkingFree }]} /><Text style={styles.legendText}>Free</Text></View>
         <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.parkingPaid }]} /><Text style={styles.legendText}>Paid</Text></View>
+        <View style={[styles.legendDivider, { backgroundColor: colors.border }]} />
+        <TouchableOpacity onPress={() => setShowZones((v) => !v)} style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: "#3B6BF5", opacity: showZones ? 1 : 0.3 }]} />
+          <Text style={[styles.legendText, { opacity: showZones ? 1 : 0.5 }]}>Zones</Text>
+        </TouchableOpacity>
       </Card>
 
       {selectedLot && !longPressCoord && (
@@ -514,10 +606,33 @@ const styles = StyleSheet.create({
   pinEmoji: { fontSize: 32 },
   floatingSearch: { position: "absolute", left: 16, right: 16, zIndex: 10 },
   searchInput: { backgroundColor: "white", height: 50 },
-  legend: { position: "absolute", right: 16, width: 80, zIndex: 10, padding: 10 },
+  legend: { position: "absolute", right: 16, width: 86, zIndex: 10, padding: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
   legendText: { fontSize: 12, fontWeight: "500" },
+  legendDivider: { height: 1, marginVertical: 4 },
+  zoneBanner: {
+    position: "absolute",
+    left: 16,
+    right: 100,
+    zIndex: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  zoneBannerBlue: { backgroundColor: "#EEF3FF", borderWidth: 1.5, borderColor: "rgba(14,75,241,0.25)" },
+  zoneBannerGreen: { backgroundColor: "#F0FFF6", borderWidth: 1.5, borderColor: "rgba(34,197,94,0.3)" },
+  zoneBannerEmoji: { fontSize: 22 },
+  zoneBannerTitle: { fontSize: 13, fontWeight: "700", color: "#1A1A2E" },
+  zoneBannerSub: { fontSize: 11, color: "#555", marginTop: 1 },
   bottomSheet: { position: "absolute", left: 16, right: 16, zIndex: 20 },
   closeButton: { position: "absolute", right: 12, top: 12, zIndex: 30 },
   lotHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 },

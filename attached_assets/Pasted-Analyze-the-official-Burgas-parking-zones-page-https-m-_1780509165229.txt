@@ -1,0 +1,84 @@
+Analyze the official Burgas parking zones page:
+
+https://m.travelburgas.eu/bg/blue-zone
+
+Goal:
+Implement Blue Zone and Green Zone parking detection in my existing Google Maps application.
+
+Requirements:
+
+1. Inspect the website and determine how the parking zones are loaded.
+   - Check for GeoJSON files.
+   - Check for Leaflet/OpenStreetMap layers.
+   - Check for API endpoints returning coordinates.
+   - Check for embedded polygon data.
+   - Identify the most reliable source of zone geometry.
+
+2. Extract all Blue Zone and Green Zone polygons from the official source.
+
+3. Generate reusable GeoJSON files:
+   /data/burgas-blue-zone.geojson
+   /data/burgas-green-zone.geojson
+
+4. Create a ZoneService module that:
+   - Loads and caches GeoJSON data.
+   - Accepts latitude and longitude.
+   - Determines whether a point is inside a Blue Zone polygon.
+   - Determines whether a point is inside a Green Zone polygon.
+   - Returns:
+
+   interface ZoneResult {
+     zone: "blue" | "green" | null;
+     subZone?: string;
+   }
+
+5. Create a Google Maps integration module:
+   MapZoneRenderer.ts
+
+   Responsibilities:
+   - Render Blue Zone polygons with blue fill color.
+   - Render Green Zone polygons with green fill color.
+   - Use semi-transparent fills (opacity 0.3).
+   - Support future addition of more parking zones.
+
+6. Create a LocationWatcher module that:
+   - Tracks the user's GPS position.
+   - Re-checks zone status whenever the location changes.
+   - Emits zone updates.
+
+7. Use Google Maps Geometry Library for point-in-polygon checks whenever possible:
+   google.maps.geometry.poly.containsLocation()
+
+8. Build a clean architecture:
+
+   /services/ZoneService.ts
+   /services/LocationWatcher.ts
+   /components/MapZoneRenderer.ts
+   /data/*.geojson
+
+9. If the official website exposes an API endpoint for zone geometry:
+   - Create an importer script.
+   - Automatically refresh local GeoJSON files once per day.
+   - Fall back to cached data if the API is unavailable.
+
+10. Optimize for production:
+   - TypeScript strict mode.
+   - Error handling.
+   - Lazy loading of GeoJSON.
+   - Polygon caching.
+   - Minimal Google Maps re-renders.
+
+11. Add a sample UI banner:
+
+   Blue Zone:
+   "You are currently parked in a Blue Zone"
+
+   Green Zone:
+   "You are currently parked in a Green Zone"
+
+   Outside zones:
+   "No paid parking zone detected"
+
+12. Generate complete production-ready code with comments explaining the architecture and integration points.
+
+Before implementing, first inspect the website and identify the exact source of the parking zone geometry data. Use the official source whenever possible instead of manually drawing polygons.

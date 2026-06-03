@@ -17,6 +17,10 @@ export function Marker({ children }: any) {
   return children ?? null;
 }
 
+export function Polygon(_props: any) {
+  return null;
+}
+
 const styles = StyleSheet.create({
   placeholder: {
     backgroundColor: "#E8EEFF",
