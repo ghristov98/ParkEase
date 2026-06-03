@@ -25,10 +25,10 @@ export default function AdminDashboard() {
   if (userLoading || parkingLoading) return <LoadingScreen />;
 
   const statCards = [
-    { label: "Total Users", value: userStats?.total || 0, emoji: "👥", color: "#3B82F6" },
-    { label: "Active Users", value: userStats?.active || 0, emoji: "✅", color: "#10B981" },
-    { label: "Parking Lots", value: parkingStats?.total || 0, emoji: "🚗", color: "#F59E0B" },
-    { label: "Free Lots", value: parkingStats?.free || 0, emoji: "🌿", color: "#22C55E" },
+    { label: "Total Users", value: userStats?.total || 0, emoji: "👥", color: "#3B82F6", route: "/admin/users" },
+    { label: "Active Users", value: userStats?.active || 0, emoji: "✅", color: "#10B981", route: "/admin/users" },
+    { label: "Parking Lots", value: parkingStats?.total || 0, emoji: "🚗", color: "#F59E0B", route: "/admin/parking" },
+    { label: "Free Lots", value: parkingStats?.free || 0, emoji: "🌿", color: "#22C55E", route: "/admin/parking" },
   ];
 
   return (
@@ -38,13 +38,15 @@ export default function AdminDashboard() {
     >
       <View style={styles.grid}>
         {statCards.map((stat, i) => (
-          <Card key={i} style={styles.statCard as any}>
-            <View style={[styles.iconContainer, { backgroundColor: stat.color + "20" }]}>
-              <Text style={styles.statEmoji}>{stat.emoji}</Text>
-            </View>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>{stat.value}</Text>
-            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
-          </Card>
+          <TouchableOpacity key={i} onPress={() => router.push(stat.route as any)} activeOpacity={0.75}>
+            <Card style={styles.statCard as any}>
+              <View style={[styles.iconContainer, { backgroundColor: stat.color + "20" }]}>
+                <Text style={styles.statEmoji}>{stat.emoji}</Text>
+              </View>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{stat.value}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
+            </Card>
+          </TouchableOpacity>
         ))}
       </View>
 
