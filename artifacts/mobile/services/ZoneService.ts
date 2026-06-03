@@ -8,8 +8,8 @@
  *   checkZone(lat, lng)              →  returns ZoneResult
  */
 
-import blueZoneData from "../data/burgas-blue-zone.geojson";
-import greenZoneData from "../data/burgas-green-zone.geojson";
+import blueZoneData from "../data/burgas-blue-zone.json";
+import greenZoneData from "../data/burgas-green-zone.json";
 
 export interface ZoneResult {
   zone: "blue" | "green" | null;
