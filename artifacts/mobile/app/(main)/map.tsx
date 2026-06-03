@@ -4,12 +4,14 @@ import {
   useDeleteParkingLot,
 } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -36,18 +38,51 @@ const INITIAL_REGION = {
 
 const NEARBY_THRESHOLD_M = 300;
 
-function getDistanceMeters(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
-): number {
+const BASE_URL = "https://" + (process.env.EXPO_PUBLIC_DOMAIN ?? "");
+
+const AMENITIES = [
+  { key: "hasSecurityGuard", label: "Security Guard", emoji: "💂" },
+  { key: "hasCCTV", label: "CCTV Cameras", emoji: "📷" },
+  { key: "hasLighting", label: "Lighting", emoji: "💡" },
+  { key: "isCovered", label: "Covered", emoji: "🏠" },
+  { key: "hasEVCharging", label: "EV Charging", emoji: "⚡" },
+  { key: "hasDisabledAccess", label: "Disabled Access", emoji: "♿" },
+] as const;
+
+type AmenityKey = typeof AMENITIES[number]["key"];
+
+interface AddForm {
+  name: string;
+  type: "free" | "paid";
+  openingHours: string;
+  amenities: Record<AmenityKey, boolean>;
+  photos: string[];
+  mainPhotoIndex: number;
+}
+
+const DEFAULT_FORM: AddForm = {
+  name: "",
+  type: "free",
+  openingHours: "",
+  amenities: {
+    hasSecurityGuard: false,
+    hasCCTV: false,
+    hasLighting: false,
+    isCovered: false,
+    hasEVCharging: false,
+    hasDisabledAccess: false,
+  },
+  photos: [],
+  mainPhotoIndex: 0,
+};
+
+function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -56,18 +91,16 @@ export default function MapScreen() {
   const [search, setSearch] = useState("");
   const [selectedLot, setSelectedLot] = useState<any>(null);
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
-
   const [longPressCoord, setLongPressCoord] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [addForm, setAddForm] = useState({ name: "", type: "free" as "free" | "paid" });
+  const [addForm, setAddForm] = useState<AddForm>(DEFAULT_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
 
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
-
   const createMutation = useCreateParkingLot();
   const deleteMutation = useDeleteParkingLot();
 
@@ -82,59 +115,93 @@ export default function MapScreen() {
         setLocationPermission(status === "granted");
         if (status === "granted") {
           try {
-            const location = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-            });
+            const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
             setRegion({
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
               latitudeDelta: 0.05,
               longitudeDelta: 0.05,
             });
-          } catch {
-            // Location hardware unavailable — keep default region
-          }
+          } catch { /* keep default */ }
         }
-      } catch {
-        // Permission API unavailable — keep default region
-      }
+      } catch { /* keep default */ }
     })();
   }, []);
 
   const nearbyLot = longPressCoord
     ? (parkingLots ?? []).find(
-        (lot) =>
-          getDistanceMeters(
-            longPressCoord.latitude,
-            longPressCoord.longitude,
-            lot.latitude,
-            lot.longitude
-          ) <= NEARBY_THRESHOLD_M
+        (lot) => getDistanceMeters(longPressCoord.latitude, longPressCoord.longitude, lot.latitude, lot.longitude) <= NEARBY_THRESHOLD_M
       ) ?? null
     : null;
 
   const handleLongPress = (e: any) => {
     if (user?.role !== "superadmin") return;
-    const coord = e.nativeEvent.coordinate;
-    setLongPressCoord(coord);
-    setAddForm({ name: "", type: "free" });
+    setLongPressCoord(e.nativeEvent.coordinate);
+    setAddForm(DEFAULT_FORM);
     setSelectedLot(null);
+  };
+
+  const pickPhotos = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      const uris = result.assets.map((a) => a.uri);
+      setAddForm((f) => ({ ...f, photos: [...f.photos, ...uris] }));
+    }
+  };
+
+  const uploadPhoto = async (lotId: string, uri: string): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("photo", { uri, name: "photo.jpg", type: "image/jpeg" } as any);
+    try {
+      const resp = await fetch(`${BASE_URL}/api/parking/${lotId}/photos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return data.url as string;
+    } catch {
+      return null;
+    }
   };
 
   const handleAddPark = async () => {
     if (!addForm.name.trim() || !longPressCoord) return;
     setIsSaving(true);
     try {
-      await createMutation.mutateAsync({
+      const lot = await createMutation.mutateAsync({
         data: {
           name: addForm.name.trim(),
           address: `${longPressCoord.latitude.toFixed(5)}, ${longPressCoord.longitude.toFixed(5)}`,
           latitude: longPressCoord.latitude,
           longitude: longPressCoord.longitude,
           type: addForm.type,
-          description: "",
-        },
+          description: addForm.openingHours ? `Hours: ${addForm.openingHours}` : "",
+          ...addForm.amenities,
+          openingHours: addForm.openingHours || undefined,
+        } as any,
       });
+
+      // Upload photos sequentially
+      if (addForm.photos.length > 0) {
+        for (const uri of addForm.photos) {
+          await uploadPhoto(lot.id, uri);
+        }
+        // If main photo is not the first uploaded, update it
+        if (addForm.mainPhotoIndex !== 0) {
+          await fetch(`${BASE_URL}/api/parking/${lot.id}`, {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ mainPhotoIndex: addForm.mainPhotoIndex }),
+          });
+        }
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
       setLongPressCoord(null);
     } catch (err: any) {
@@ -146,29 +213,28 @@ export default function MapScreen() {
 
   const handleRemovePark = () => {
     if (!nearbyLot) return;
-    Alert.alert(
-      "Remove Parking Lot",
-      `Remove "${nearbyLot.name}" from the map?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            setIsRemoving(true);
-            try {
-              await deleteMutation.mutateAsync({ id: nearbyLot.id });
-              await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
-              setLongPressCoord(null);
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Failed to remove");
-            } finally {
-              setIsRemoving(false);
-            }
-          },
+    Alert.alert("Remove Parking Lot", `Remove "${nearbyLot.name}" from the map?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove", style: "destructive",
+        onPress: async () => {
+          setIsRemoving(true);
+          try {
+            await deleteMutation.mutateAsync({ id: nearbyLot.id });
+            await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
+            setLongPressCoord(null);
+          } catch (err: any) {
+            Alert.alert("Error", err.message || "Failed to remove");
+          } finally {
+            setIsRemoving(false);
+          }
         },
-      ]
-    );
+      },
+    ]);
+  };
+
+  const toggleAmenity = (key: AmenityKey) => {
+    setAddForm((f) => ({ ...f, amenities: { ...f.amenities, [key]: !f.amenities[key] } }));
   };
 
   if (Platform.OS === "web") {
@@ -176,12 +242,7 @@ export default function MapScreen() {
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.webHeader}>
           <Text style={[styles.webTitle, { color: colors.foreground }]}>Parking Lots</Text>
-          <Input
-            placeholder="Search parking lots..."
-            value={search}
-            onChangeText={setSearch}
-            leftIconText="🔍"
-          />
+          <Input placeholder="Search parking lots..." value={search} onChangeText={setSearch} leftIconText="🔍" />
         </View>
         <FlatList
           data={parkingLots}
@@ -194,17 +255,11 @@ export default function MapScreen() {
                   <Text style={[styles.lotName, { color: colors.foreground }]}>{item.name}</Text>
                   <Badge label={item.type} variant={item.type === "free" ? "free" : "paid"} />
                 </View>
-                <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>
-                  {item.address}
-                </Text>
+                <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>{item.address}</Text>
               </Card>
             </TouchableOpacity>
           )}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ color: colors.mutedForeground }}>No parking lots found</Text>
-            </View>
-          }
+          ListEmptyComponent={<View style={styles.empty}><Text style={{ color: colors.mutedForeground }}>No parking lots found</Text></View>}
         />
       </View>
     );
@@ -219,51 +274,40 @@ export default function MapScreen() {
         showsUserLocation={!!locationPermission}
         onLongPress={handleLongPress}
       >
-        {parkingLots?.map((lot) => (
-          <Marker
-            key={lot.id}
-            coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
-            onPress={() => { setSelectedLot(lot); setLongPressCoord(null); }}
-          >
-            <View
-              style={[
-                styles.marker,
-                { backgroundColor: lot.type === "free" ? colors.parkingFree : colors.parkingPaid },
-              ]}
+        {parkingLots?.map((lot) => {
+          const mainPhoto = lot.photos && lot.photos.length > 0
+            ? lot.photos[Math.min((lot as any).mainPhotoIndex ?? 0, lot.photos.length - 1)]
+            : null;
+          return (
+            <Marker
+              key={lot.id}
+              coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
+              onPress={() => { setSelectedLot(lot); setLongPressCoord(null); }}
             >
-              <Text style={styles.markerEmoji}>🚗</Text>
-            </View>
-          </Marker>
-        ))}
-
+              <View style={[styles.marker, { backgroundColor: lot.type === "free" ? colors.parkingFree : colors.parkingPaid }]}>
+                {mainPhoto ? (
+                  <Image source={{ uri: mainPhoto }} style={styles.markerPhoto} />
+                ) : (
+                  <Text style={styles.markerEmoji}>🚗</Text>
+                )}
+              </View>
+            </Marker>
+          );
+        })}
         {longPressCoord && (
           <Marker coordinate={longPressCoord} anchor={{ x: 0.5, y: 1 }}>
-            <View style={styles.pinContainer}>
-              <Text style={styles.pinEmoji}>📍</Text>
-            </View>
+            <Text style={styles.pinEmoji}>📍</Text>
           </Marker>
         )}
       </MapView>
 
       <View style={[styles.floatingSearch, { top: insets.top + 10 }]}>
-        <Input
-          placeholder="Search locations..."
-          value={search}
-          onChangeText={setSearch}
-          leftIconText="🔍"
-          style={styles.searchInput}
-        />
+        <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIconText="🔍" style={styles.searchInput} />
       </View>
 
       <Card style={{ ...styles.legend, top: insets.top + 80 }}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.parkingFree }]} />
-          <Text style={styles.legendText}>Free</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: colors.parkingPaid }]} />
-          <Text style={styles.legendText}>Paid</Text>
-        </View>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.parkingFree }]} /><Text style={styles.legendText}>Free</Text></View>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.parkingPaid }]} /><Text style={styles.legendText}>Paid</Text></View>
       </Card>
 
       {selectedLot && !longPressCoord && (
@@ -277,13 +321,8 @@ export default function MapScreen() {
                 <Text style={[styles.lotName, { color: colors.foreground }]}>{selectedLot.name}</Text>
                 <Badge label={selectedLot.type} variant={selectedLot.type === "free" ? "free" : "paid"} />
               </View>
-              <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>
-                {selectedLot.address}
-              </Text>
-              <TouchableOpacity
-                style={[styles.detailsButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push(`/parking/${selectedLot.id}`)}
-              >
+              <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>{selectedLot.address}</Text>
+              <TouchableOpacity style={[styles.detailsButton, { backgroundColor: colors.primary }]} onPress={() => router.push(`/parking/${selectedLot.id}`)}>
                 <Text style={styles.detailsButtonText}>View Details</Text>
                 <Text style={styles.arrowEmoji}>→</Text>
               </TouchableOpacity>
@@ -293,29 +332,18 @@ export default function MapScreen() {
       )}
 
       {user?.role === "superadmin" && (
-        <TouchableOpacity
-          style={[styles.adminFab, { bottom: 100 + insets.bottom, backgroundColor: colors.primary }]}
-          onPress={() => router.push("/admin")}
-        >
+        <TouchableOpacity style={[styles.adminFab, { bottom: 100 + insets.bottom, backgroundColor: colors.primary }]} onPress={() => router.push("/admin")}>
           <Text style={styles.fabEmoji}>⚙️</Text>
         </TouchableOpacity>
       )}
 
-      {/* Long-press bubble modal — superadmin only */}
-      <Modal
-        visible={!!longPressCoord}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setLongPressCoord(null)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setLongPressCoord(null)}
-        />
+      {/* Long-press bubble — superadmin only */}
+      <Modal visible={!!longPressCoord} transparent animationType="slide" onRequestClose={() => setLongPressCoord(null)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setLongPressCoord(null)} />
         <View style={[styles.bubble, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.bubbleHandle} />
 
+          {/* Header */}
           <View style={styles.bubbleHeader}>
             <Text style={styles.bubblePin}>📍</Text>
             <View style={{ flex: 1 }}>
@@ -333,72 +361,131 @@ export default function MapScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Add form */}
-          <View style={styles.bubbleForm}>
-            <Input
-              label="Parking Lot Name"
-              placeholder="e.g. City Center Parking"
-              value={addForm.name}
-              onChangeText={(t) => setAddForm({ ...addForm, name: t })}
-            />
-            <Text style={[styles.typeLabel, { color: colors.mutedForeground }]}>Type</Text>
-            <View style={styles.typeRow}>
-              <TouchableOpacity
-                style={[
-                  styles.typeBtn,
-                  { borderColor: colors.border },
-                  addForm.type === "free" && { backgroundColor: colors.parkingFree, borderColor: colors.parkingFree },
-                ]}
-                onPress={() => setAddForm({ ...addForm, type: "free" })}
-              >
-                <Text style={[styles.typeBtnText, addForm.type === "free" && { color: "white" }]}>
-                  🟢 Free
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 520 }}>
+            {/* Name + Type */}
+            <View style={styles.section}>
+              <Input
+                label="Parking Lot Name"
+                placeholder="e.g. City Center Parking"
+                value={addForm.name}
+                onChangeText={(t) => setAddForm((f) => ({ ...f, name: t }))}
+              />
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Type</Text>
+              <View style={styles.typeRow}>
+                {(["free", "paid"] as const).map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    style={[styles.typeBtn, { borderColor: colors.border }, addForm.type === t && { backgroundColor: t === "free" ? colors.parkingFree : colors.parkingPaid, borderColor: "transparent" }]}
+                    onPress={() => setAddForm((f) => ({ ...f, type: t }))}
+                  >
+                    <Text style={[styles.typeBtnText, { color: addForm.type === t ? "white" : colors.foreground }]}>
+                      {t === "free" ? "🟢 Free" : "🟠 Paid"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Working Hours */}
+            <View style={styles.section}>
+              <Input
+                label="⏰  Opening Hours"
+                placeholder="e.g. Mon–Fri 08:00–20:00, Sat–Sun 09:00–18:00"
+                value={addForm.openingHours}
+                onChangeText={(t) => setAddForm((f) => ({ ...f, openingHours: t }))}
+              />
+            </View>
+
+            {/* Photos */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>📸  Photos</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
+                {addForm.photos.map((uri, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => setAddForm((f) => ({ ...f, mainPhotoIndex: i }))}
+                    style={styles.photoThumbWrap}
+                  >
+                    <Image source={{ uri }} style={[styles.photoThumb, addForm.mainPhotoIndex === i && styles.photoThumbMain]} />
+                    {addForm.mainPhotoIndex === i && (
+                      <View style={styles.mainBadge}><Text style={styles.mainBadgeText}>MAIN</Text></View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.photoRemoveBtn}
+                      onPress={() => setAddForm((f) => {
+                        const photos = f.photos.filter((_, j) => j !== i);
+                        return { ...f, photos, mainPhotoIndex: Math.min(f.mainPhotoIndex, Math.max(0, photos.length - 1)) };
+                      })}
+                    >
+                      <Text style={styles.photoRemoveText}>✕</Text>
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={[styles.addPhotoBtn, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={pickPhotos}>
+                  <Text style={styles.addPhotoBtnText}>➕</Text>
+                  <Text style={[styles.addPhotoBtnLabel, { color: colors.mutedForeground }]}>Add Photo</Text>
+                </TouchableOpacity>
+              </ScrollView>
+              {addForm.photos.length > 1 && (
+                <Text style={[styles.mainPhotoHint, { color: colors.mutedForeground }]}>
+                  Tap a photo to set it as the main map marker image
                 </Text>
-              </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Amenities */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>🏷️  Amenities</Text>
+              <View style={styles.amenityGrid}>
+                {AMENITIES.map(({ key, label, emoji }) => {
+                  const active = addForm.amenities[key];
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      onPress={() => toggleAmenity(key)}
+                      style={[
+                        styles.amenityChip,
+                        { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "15" : colors.muted },
+                      ]}
+                    >
+                      <Text style={styles.amenityEmoji}>{emoji}</Text>
+                      <Text style={[styles.amenityLabel, { color: active ? colors.primary : colors.foreground }]}>{label}</Text>
+                      {active && <Text style={[styles.amenityCheck, { color: colors.primary }]}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Save button */}
+            <View style={[styles.section, { paddingBottom: 4 }]}>
               <TouchableOpacity
-                style={[
-                  styles.typeBtn,
-                  { borderColor: colors.border },
-                  addForm.type === "paid" && { backgroundColor: colors.parkingPaid, borderColor: colors.parkingPaid },
-                ]}
-                onPress={() => setAddForm({ ...addForm, type: "paid" })}
+                style={[styles.saveBtn, { backgroundColor: colors.primary }, (!addForm.name.trim() || isSaving) && { opacity: 0.5 }]}
+                onPress={handleAddPark}
+                disabled={!addForm.name.trim() || isSaving}
               >
-                <Text style={[styles.typeBtnText, addForm.type === "paid" && { color: "white" }]}>
-                  🟠 Paid
-                </Text>
+                <Text style={styles.saveBtnText}>{isSaving ? "Adding…" : "➕  Add Parking Lot"}</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.saveBtn,
-                { backgroundColor: colors.primary },
-                (!addForm.name.trim() || isSaving) && { opacity: 0.5 },
-              ]}
-              onPress={handleAddPark}
-              disabled={!addForm.name.trim() || isSaving}
-            >
-              <Text style={styles.saveBtnText}>{isSaving ? "Adding…" : "➕ Add Parking Lot"}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Remove section — only if a nearby lot exists */}
-          {nearbyLot && (
-            <View style={[styles.removeSection, { borderTopColor: colors.border }]}>
-              <Text style={[styles.removeLabel, { color: colors.mutedForeground }]}>
-                Nearby: <Text style={{ fontWeight: "700", color: colors.foreground }}>{nearbyLot.name}</Text>
-              </Text>
-              <TouchableOpacity
-                style={[styles.removeBtn, { borderColor: colors.destructive }, isRemoving && { opacity: 0.5 }]}
-                onPress={handleRemovePark}
-                disabled={isRemoving}
-              >
-                <Text style={[styles.removeBtnText, { color: colors.destructive }]}>
-                  {isRemoving ? "Removing…" : `🗑️ Remove "${nearbyLot.name}"`}
+            {/* Remove nearby lot */}
+            {nearbyLot && (
+              <View style={[styles.removeSection, { borderTopColor: colors.border }]}>
+                <Text style={[styles.removeLabel, { color: colors.mutedForeground }]}>
+                  Nearby: <Text style={{ fontWeight: "700", color: colors.foreground }}>{nearbyLot.name}</Text>
                 </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+                <TouchableOpacity
+                  style={[styles.removeBtn, { borderColor: colors.destructive }, isRemoving && { opacity: 0.5 }]}
+                  onPress={handleRemovePark}
+                  disabled={isRemoving}
+                >
+                  <Text style={[styles.removeBtnText, { color: colors.destructive }]}>
+                    {isRemoving ? "Removing…" : `🗑️  Remove "${nearbyLot.name}"`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -408,147 +495,106 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   marker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: "white",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
     elevation: 5,
+    overflow: "hidden",
   },
-  pinContainer: { alignItems: "center" },
+  markerPhoto: { width: 36, height: 36, borderRadius: 18 },
+  markerEmoji: { fontSize: 16 },
   pinEmoji: { fontSize: 32 },
-  floatingSearch: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    zIndex: 10,
-  },
+  floatingSearch: { position: "absolute", left: 16, right: 16, zIndex: 10 },
   searchInput: { backgroundColor: "white", height: 50 },
-  legend: {
-    position: "absolute",
-    right: 16,
-    width: 80,
-    zIndex: 10,
-    padding: 10,
-  },
+  legend: { position: "absolute", right: 16, width: 80, zIndex: 10, padding: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
   legendText: { fontSize: 12, fontWeight: "500" },
   bottomSheet: { position: "absolute", left: 16, right: 16, zIndex: 20 },
   closeButton: { position: "absolute", right: 12, top: 12, zIndex: 30 },
-  lotHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 4,
-  },
+  lotHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 },
   lotName: { fontSize: 18, fontWeight: "700", flex: 1, marginRight: 8 },
   lotAddress: { fontSize: 14, marginBottom: 16 },
-  detailsButton: {
-    flexDirection: "row",
-    height: 44,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
+  detailsButton: { flexDirection: "row", height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", gap: 8 },
   detailsButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
-  markerEmoji: { fontSize: 14 },
   closeEmoji: { fontSize: 18, fontWeight: "600" },
   arrowEmoji: { fontSize: 16, color: "white", fontWeight: "600" },
   fabEmoji: { fontSize: 22 },
   adminFab: {
-    position: "absolute",
-    right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-    zIndex: 10,
+    position: "absolute", right: 16, width: 56, height: 56, borderRadius: 28,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65,
+    elevation: 8, zIndex: 10,
   },
   webHeader: { padding: 16, gap: 16 },
   webTitle: { fontSize: 24, fontWeight: "700" },
   webList: { padding: 16, gap: 12 },
   lotCard: { marginBottom: 4 },
   empty: { padding: 40, alignItems: "center" },
-  // Modal / bubble
-  modalBackdrop: {
-    flex: 1,
-  },
+  // Modal
+  modalBackdrop: { flex: 1 },
   bubble: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 16,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 16,
   },
-  bubbleHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#DDD",
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  bubbleHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    gap: 12,
-  },
-  bubblePin: { fontSize: 28 },
+  bubbleHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#DDD", alignSelf: "center", marginBottom: 12 },
+  bubbleHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, marginBottom: 4, gap: 12 },
+  bubblePin: { fontSize: 26 },
   bubbleTitle: { fontSize: 17, fontWeight: "700" },
-  bubbleCoords: { fontSize: 12, marginTop: 2 },
-  bubbleForm: { paddingHorizontal: 20, gap: 12 },
-  typeLabel: { fontSize: 13, fontWeight: "500", marginBottom: -4 },
-  typeRow: { flexDirection: "row", gap: 12 },
-  typeBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  bubbleCoords: { fontSize: 11, marginTop: 1 },
+  section: { paddingHorizontal: 20, paddingTop: 12, gap: 8 },
+  sectionLabel: { fontSize: 13, fontWeight: "600", marginBottom: -4 },
+  typeRow: { flexDirection: "row", gap: 10 },
+  typeBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   typeBtnText: { fontWeight: "600", fontSize: 15 },
-  saveBtn: {
-    height: 50,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
+  // Photos
+  photoRow: { gap: 10, paddingVertical: 4 },
+  photoThumbWrap: { position: "relative" },
+  photoThumb: { width: 80, height: 80, borderRadius: 10 },
+  photoThumbMain: { borderWidth: 2.5, borderColor: "#0E4BF1" },
+  mainBadge: {
+    position: "absolute", bottom: 4, left: 4, backgroundColor: "#0E4BF1",
+    borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1,
   },
+  mainBadgeText: { color: "white", fontSize: 9, fontWeight: "700" },
+  photoRemoveBtn: {
+    position: "absolute", top: -6, right: -6, width: 20, height: 20,
+    borderRadius: 10, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center",
+  },
+  photoRemoveText: { color: "white", fontSize: 10, fontWeight: "700" },
+  addPhotoBtn: {
+    width: 80, height: 80, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed",
+    alignItems: "center", justifyContent: "center", gap: 4,
+  },
+  addPhotoBtnText: { fontSize: 20 },
+  addPhotoBtnLabel: { fontSize: 10, fontWeight: "600" },
+  mainPhotoHint: { fontSize: 11, marginTop: -4 },
+  // Amenities
+  amenityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  amenityChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
+  },
+  amenityEmoji: { fontSize: 14 },
+  amenityLabel: { fontSize: 12, fontWeight: "600" },
+  amenityCheck: { fontSize: 12, fontWeight: "800" },
+  // Save
+  saveBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   saveBtnText: { color: "white", fontWeight: "700", fontSize: 16 },
+  // Remove
   removeSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 10,
+    marginTop: 12, paddingTop: 14, paddingHorizontal: 20, paddingBottom: 8,
+    borderTopWidth: StyleSheet.hairlineWidth, gap: 10,
   },
   removeLabel: { fontSize: 13 },
-  removeBtn: {
-    height: 46,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  removeBtn: { height: 46, borderRadius: 12, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   removeBtnText: { fontWeight: "700", fontSize: 15 },
 });

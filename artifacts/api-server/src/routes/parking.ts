@@ -48,13 +48,25 @@ router.get("/parking/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/parking", requireSuperAdmin, async (req, res): Promise<void> => {
-  const { name, address, latitude, longitude, type, description, extraIds } = req.body;
+  const {
+    name, address, latitude, longitude, type, description, extraIds,
+    openingHours, hasSecurityGuard, hasCCTV, hasLighting, isCovered, hasEVCharging, hasDisabledAccess,
+  } = req.body;
   if (!name || !address || latitude == null || longitude == null || !type) {
     res.status(400).json({ error: "validation_error", message: "Required fields missing" });
     return;
   }
 
-  const [lot] = await db.insert(parkingLotsTable).values({ name, address, latitude, longitude, type, description }).returning();
+  const [lot] = await db.insert(parkingLotsTable).values({
+    name, address, latitude, longitude, type, description,
+    openingHours: openingHours || null,
+    hasSecurityGuard: !!hasSecurityGuard,
+    hasCCTV: !!hasCCTV,
+    hasLighting: !!hasLighting,
+    isCovered: !!isCovered,
+    hasEVCharging: !!hasEVCharging,
+    hasDisabledAccess: !!hasDisabledAccess,
+  }).returning();
   if (extraIds?.length > 0) {
     await db.insert(parkingLotExtrasTable).values(extraIds.map((eid: string) => ({ parkingLotId: lot!.id, extraId: eid })));
   }
@@ -64,9 +76,23 @@ router.post("/parking", requireSuperAdmin, async (req, res): Promise<void> => {
 
 router.put("/parking/:id", requireSuperAdmin, async (req, res): Promise<void> => {
   const id = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
-  const { name, address, latitude, longitude, type, description, extraIds } = req.body;
+  const {
+    name, address, latitude, longitude, type, description, extraIds,
+    openingHours, hasSecurityGuard, hasCCTV, hasLighting, isCovered, hasEVCharging, hasDisabledAccess,
+    mainPhotoIndex,
+  } = req.body;
 
-  const [lot] = await db.update(parkingLotsTable).set({ name, address, latitude, longitude, type, description }).where(eq(parkingLotsTable.id, id)).returning();
+  const [lot] = await db.update(parkingLotsTable).set({
+    name, address, latitude, longitude, type, description,
+    ...(openingHours !== undefined ? { openingHours: openingHours || null } : {}),
+    ...(hasSecurityGuard !== undefined ? { hasSecurityGuard: !!hasSecurityGuard } : {}),
+    ...(hasCCTV !== undefined ? { hasCCTV: !!hasCCTV } : {}),
+    ...(hasLighting !== undefined ? { hasLighting: !!hasLighting } : {}),
+    ...(isCovered !== undefined ? { isCovered: !!isCovered } : {}),
+    ...(hasEVCharging !== undefined ? { hasEVCharging: !!hasEVCharging } : {}),
+    ...(hasDisabledAccess !== undefined ? { hasDisabledAccess: !!hasDisabledAccess } : {}),
+    ...(mainPhotoIndex !== undefined ? { mainPhotoIndex: Number(mainPhotoIndex) } : {}),
+  }).where(eq(parkingLotsTable.id, id)).returning();
   if (!lot) { res.status(404).json({ error: "not_found", message: "Parking lot not found" }); return; }
 
   if (Array.isArray(extraIds)) {

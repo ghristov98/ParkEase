@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
+  Dimensions,
   Image,
   Linking,
   Platform,
@@ -21,6 +22,17 @@ import { Card } from "@/components/ui/Card";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useColors } from "@/hooks/useColors";
 
+const SCREEN_W = Dimensions.get("window").width;
+
+const AMENITY_MAP: Record<string, { emoji: string; label: string }> = {
+  hasSecurityGuard: { emoji: "💂", label: "Security Guard" },
+  hasCCTV: { emoji: "📷", label: "CCTV Cameras" },
+  hasLighting: { emoji: "💡", label: "Lighting" },
+  isCovered: { emoji: "🏠", label: "Covered" },
+  hasEVCharging: { emoji: "⚡", label: "EV Charging" },
+  hasDisabledAccess: { emoji: "♿", label: "Disabled Access" },
+};
+
 export default function ParkingLotDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: lot, isLoading } = useQuery(getGetParkingLotByIdQueryOptions(id!));
@@ -30,6 +42,19 @@ export default function ParkingLotDetails() {
 
   if (isLoading) return <LoadingScreen />;
   if (!lot) return null;
+
+  const lotAny = lot as any;
+  const mainPhotoIdx = lotAny.mainPhotoIndex ?? 0;
+  const orderedPhotos = lot.photos && lot.photos.length > 0
+    ? [
+        lot.photos[mainPhotoIdx] ?? lot.photos[0]!,
+        ...lot.photos.filter((_, i) => i !== mainPhotoIdx),
+      ]
+    : [];
+
+  const activeAmenities = Object.entries(AMENITY_MAP).filter(
+    ([key]) => (lotAny as any)[key] === true
+  );
 
   const openInMaps = () => {
     const scheme = Platform.select({ ios: "maps:0,0?q=", android: "geo:0,0?q=" });
@@ -46,16 +71,22 @@ export default function ParkingLotDetails() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+        {/* Photo carousel */}
         <View style={styles.imageContainer}>
-          {lot.photos && lot.photos.length > 0 ? (
+          {orderedPhotos.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-              {lot.photos.map((photo, index) => (
-                <Image key={index} source={{ uri: photo }} style={styles.photo} />
+              {orderedPhotos.map((photo, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: photo }}
+                  style={[styles.photo, { width: SCREEN_W }]}
+                  resizeMode="cover"
+                />
               ))}
             </ScrollView>
           ) : (
             <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Text style={styles.imageEmoji}>🖼️</Text>
+              <Text style={styles.imageEmoji}>🅿️</Text>
             </View>
           )}
           <TouchableOpacity
@@ -64,9 +95,15 @@ export default function ParkingLotDetails() {
           >
             <Text style={styles.backEmoji}>←</Text>
           </TouchableOpacity>
+          {orderedPhotos.length > 1 && (
+            <View style={styles.photoCount}>
+              <Text style={styles.photoCountText}>1 / {orderedPhotos.length}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.content}>
+          {/* Name + type badge */}
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.name, { color: colors.foreground }]}>{lot.name}</Text>
@@ -82,6 +119,53 @@ export default function ParkingLotDetails() {
             />
           </View>
 
+          {/* Opening hours */}
+          {lotAny.openingHours ? (
+            <Card style={styles.hoursCard}>
+              <View style={styles.hoursRow}>
+                <Text style={styles.clockEmoji}>⏰</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.hoursLabel, { color: colors.mutedForeground }]}>Opening Hours</Text>
+                  <Text style={[styles.hoursValue, { color: colors.foreground }]}>{lotAny.openingHours}</Text>
+                </View>
+              </View>
+            </Card>
+          ) : null}
+
+          {/* Amenities from new boolean fields */}
+          {activeAmenities.length > 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Amenities</Text>
+              <View style={styles.amenityGrid}>
+                {activeAmenities.map(([key, { emoji, label }]) => (
+                  <View
+                    key={key}
+                    style={[styles.amenityChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  >
+                    <Text style={styles.amenityEmoji}>{emoji}</Text>
+                    <Text style={[styles.amenityText, { color: colors.foreground }]}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Legacy extras (from extras table) */}
+          {lot.extras && lot.extras.length > 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Extra Services</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.extrasList}>
+                {lot.extras.map((extra) => (
+                  <View key={extra.id} style={[styles.extraChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={styles.extraEmoji}>⭐</Text>
+                    <Text style={[styles.extraText, { color: colors.foreground }]}>{extra.name}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Mini map */}
           <View style={styles.mapContainer}>
             {Platform.OS !== "web" ? (
               <MapView
@@ -99,42 +183,26 @@ export default function ParkingLotDetails() {
                   <View
                     style={[
                       styles.marker,
-                      {
-                        backgroundColor:
-                          lot.type === "free" ? colors.parkingFree : colors.parkingPaid,
-                      },
+                      { backgroundColor: lot.type === "free" ? colors.parkingFree : colors.parkingPaid },
                     ]}
                   />
                 </Marker>
               </MapView>
             ) : (
-              <View style={[styles.miniMap, { backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }]}>
+              <View style={[styles.miniMap, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
                 <Text style={{ color: colors.mutedForeground }}>Map view not available on web</Text>
               </View>
             )}
             <TouchableOpacity style={styles.mapOverlay} onPress={openInMaps} />
           </View>
 
-          {lot.extras && lot.extras.length > 0 && (
+          {/* Description */}
+          {lot.description ? (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Amenities</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.extrasList}>
-                {lot.extras.map((extra) => (
-                  <View key={extra.id} style={[styles.extraChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Text style={styles.extraEmoji}>⭐</Text>
-                    <Text style={[styles.extraText, { color: colors.foreground }]}>{extra.name}</Text>
-                  </View>
-                ))}
-              </ScrollView>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Description</Text>
+              <Text style={[styles.description, { color: colors.mutedForeground }]}>{lot.description}</Text>
             </View>
-          )}
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Description</Text>
-            <Text style={[styles.description, { color: colors.mutedForeground }]}>
-              {lot.description || "No description available for this parking lot."}
-            </Text>
-          </View>
+          ) : null}
 
           <Button
             title="Get Directions"
@@ -150,32 +218,22 @@ export default function ParkingLotDetails() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   imageContainer: {
     height: 300,
     width: "100%",
     position: "relative",
+    overflow: "hidden",
   },
   photo: {
-    width: 400, // Should be screen width, but relative is hard in static
     height: 300,
   },
-  imageEmoji: {
-    fontSize: 56,
-  },
-  backEmoji: {
-    fontSize: 22,
-    color: "white",
-    fontWeight: "600",
-  },
-  locationEmoji: {
-    fontSize: 14,
-  },
-  extraEmoji: {
-    fontSize: 14,
-  },
+  imageEmoji: { fontSize: 64 },
+  backEmoji: { fontSize: 22, color: "white", fontWeight: "600" },
+  locationEmoji: { fontSize: 14 },
+  extraEmoji: { fontSize: 14 },
+  clockEmoji: { fontSize: 22, marginRight: 12 },
+  amenityEmoji: { fontSize: 16 },
   photoPlaceholder: {
     flex: 1,
     alignItems: "center",
@@ -187,14 +245,23 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
   },
+  photoCount: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  photoCountText: { color: "white", fontSize: 12, fontWeight: "600" },
   content: {
     padding: 20,
     marginTop: -20,
-    backgroundColor: "transparent",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -202,56 +269,33 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  name: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  addressRow: {
+  name: { fontSize: 24, fontWeight: "700", marginBottom: 8 },
+  addressRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  address: { fontSize: 14, flex: 1 },
+  badge: { paddingHorizontal: 12, paddingVertical: 4, marginLeft: 8 },
+  // Hours
+  hoursCard: { marginBottom: 20 },
+  hoursRow: { flexDirection: "row", alignItems: "center" },
+  hoursLabel: { fontSize: 12, fontWeight: "600", marginBottom: 2 },
+  hoursValue: { fontSize: 15, fontWeight: "500" },
+  // Amenities
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
+  amenityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  amenityChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-  },
-  address: {
-    fontSize: 14,
-  },
-  badge: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
   },
-  mapContainer: {
-    height: 180,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 24,
-    position: "relative",
-  },
-  miniMap: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mapOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  marker: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "white",
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  extrasList: {
-    gap: 8,
-  },
+  amenityText: { fontSize: 13, fontWeight: "600" },
+  // Extras
+  extrasList: { gap: 8 },
   extraChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -261,15 +305,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
   },
-  extraText: {
-    fontSize: 14,
-    fontWeight: "500",
+  extraText: { fontSize: 14, fontWeight: "500" },
+  // Mini map
+  mapContainer: {
+    height: 180,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 24,
+    position: "relative",
   },
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
+  miniMap: { ...StyleSheet.absoluteFillObject },
+  mapOverlay: { ...StyleSheet.absoluteFillObject },
+  marker: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
+    borderColor: "white",
   },
-  directionsButton: {
-    marginTop: 8,
-  },
+  // Description
+  description: { fontSize: 15, lineHeight: 22 },
+  directionsButton: { marginTop: 8 },
 });
