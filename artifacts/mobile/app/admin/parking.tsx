@@ -39,8 +39,8 @@ export default function AdminParking() {
   const [form, setForm] = useState({
     name: "",
     address: "",
-    latitude: "40.7128",
-    longitude: "-74.0060",
+    latitude: "42.7339",
+    longitude: "25.4858",
     type: "free" as "free" | "paid",
     description: "",
   });
@@ -50,8 +50,8 @@ export default function AdminParking() {
     setForm({
       name: "",
       address: "",
-      latitude: "40.7128",
-      longitude: "-74.0060",
+      latitude: "42.7339",
+      longitude: "25.4858",
       type: "free",
       description: "",
     });

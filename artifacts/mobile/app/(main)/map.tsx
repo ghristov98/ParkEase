@@ -22,10 +22,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 const INITIAL_REGION = {
-  latitude: 40.7128,
-  longitude: -74.006,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+  latitude: 42.7339,
+  longitude: 25.4858,
+  latitudeDelta: 5.0,
+  longitudeDelta: 5.0,
 };
 
 export default function MapScreen() {
