@@ -330,9 +330,6 @@ export default function MapScreen() {
         ))}
 
         {parkingLots?.map((lot) => {
-          const mainPhoto = lot.photos && lot.photos.length > 0
-            ? lot.photos[Math.min((lot as any).mainPhotoIndex ?? 0, lot.photos.length - 1)]
-            : null;
           return (
             <Marker
               key={lot.id}
@@ -340,11 +337,7 @@ export default function MapScreen() {
               onPress={() => { setSelectedLot(lot); setLongPressCoord(null); }}
             >
               <View style={[styles.marker, { backgroundColor: lot.type === "free" ? colors.parkingFree : colors.parkingPaid }]}>
-                {mainPhoto ? (
-                  <Image source={{ uri: mainPhoto }} style={styles.markerPhoto} />
-                ) : (
-                  <Text style={styles.markerEmoji}>🅿️</Text>
-                )}
+                <Text style={styles.markerEmoji}>🅿️</Text>
               </View>
             </Marker>
           );
