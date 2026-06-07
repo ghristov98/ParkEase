@@ -343,7 +343,7 @@ export default function MapScreen() {
                 {mainPhoto ? (
                   <Image source={{ uri: mainPhoto }} style={styles.markerPhoto} />
                 ) : (
-                  <Text style={styles.markerEmoji}>🚗</Text>
+                  <Text style={styles.markerEmoji}>🅿️</Text>
                 )}
               </View>
             </Marker>

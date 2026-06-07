@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "build": "PATH=\"/usr/local/lib/node_modules/corepack/shims:$PATH\" pnpm run typecheck && PATH=\"/usr/local/lib/node_modules/corepack/shims:$PATH\" pnpm -r --if-present run build",
+    "typecheck:libs": "PATH=\"/usr/local/lib/node_modules/corepack/shims:$PATH\" tsc --build",
+    "typecheck": "PATH=\"/usr/local/lib/node_modules/corepack/shims:$PATH\" pnpm run typecheck:libs && PATH=\"/usr/local/lib/node_modules/corepack/shims:$PATH\" pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {

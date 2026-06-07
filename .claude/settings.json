@@ -10,6 +10,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /tmp/cc-agent/67592053/project && npm run build 2>&1",
+            "timeout": 120,
+            "statusMessage": "Building project..."
+          }
+        ]
+      }
     ]
   },
   "permissions": {
