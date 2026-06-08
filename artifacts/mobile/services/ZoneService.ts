@@ -1,15 +1,9 @@
 /**
- * ZoneService — loads Burgas Blue/Green zone GeoJSON, caches polygons,
- * and performs point-in-polygon checks using a ray-casting algorithm.
- *
- * Architecture:
- *   GeoJSON files (data/*.geojson)  →  parsed once on first use
- *   containsPoint(lat, lng)          →  ray-cast against each polygon ring
- *   checkZone(lat, lng)              →  returns ZoneResult
+ * ZoneService — loads Burgas parking zones from burgas-zones.json,
+ * caches polygons, and performs point-in-polygon checks using ray-casting.
  */
 
-import blueZoneData from "../data/burgas-blue-zone.json";
-import greenZoneData from "../data/burgas-green-zone.json";
+import zoneData from "../data/burgas-zones.json";
 
 export interface ZoneResult {
   zone: "blue" | "green" | null;
@@ -27,48 +21,24 @@ type Ring = LatLng[];
 
 interface CachedPolygon {
   ring: Ring;
-  properties: Record<string, unknown>;
+  id: string;
+  title: string;
+  type: "blue" | "green";
+  color: string;
 }
 
-// ---------------------------------------------------------------------------
-// Internal cache — populated lazily on first call
-// ---------------------------------------------------------------------------
-
-let bluePolygons: CachedPolygon[] | null = null;
-let greenPolygons: CachedPolygon[] | null = null;
-
-function parseFeatureCollection(
-  data: any,
-): CachedPolygon[] {
-  const polygons: CachedPolygon[] = [];
-  for (const feature of data.features ?? []) {
-    const geom = feature.geometry;
-    if (!geom) continue;
-
-    const rings: number[][][] =
-      geom.type === "Polygon"
-        ? geom.coordinates
-        : geom.type === "MultiPolygon"
-          ? geom.coordinates.flat(1)
-          : [];
-
-    for (const ringCoords of rings) {
-      // GeoJSON coords are [longitude, latitude]
-      const ring: Ring = ringCoords.map(([lng, lat]) => ({ lat, lng }));
-      polygons.push({ ring, properties: feature.properties ?? {} });
-    }
-  }
-  return polygons;
-}
+let cachedPolygons: CachedPolygon[] | null = null;
 
 function ensureLoaded(): void {
-  if (!bluePolygons) bluePolygons = parseFeatureCollection(blueZoneData);
-  if (!greenPolygons) greenPolygons = parseFeatureCollection(greenZoneData);
+  if (cachedPolygons) return;
+  cachedPolygons = zoneData.zones.map((z) => ({
+    ring: z.coordinates.map((c) => ({ lat: c.lat, lng: c.lng })),
+    id: z.id,
+    title: z.title,
+    type: z.type as "blue" | "green",
+    color: z.color,
+  }));
 }
-
-// ---------------------------------------------------------------------------
-// Ray-casting point-in-polygon (works for non-convex polygons)
-// ---------------------------------------------------------------------------
 
 function pointInRing(lat: number, lng: number, ring: Ring): boolean {
   let inside = false;
@@ -83,66 +53,53 @@ function pointInRing(lat: number, lng: number, ring: Ring): boolean {
   return inside;
 }
 
-function checkPolygons(
-  lat: number,
-  lng: number,
-  polygons: CachedPolygon[],
-): CachedPolygon | null {
+function findPolygon(lat: number, lng: number, polygons: CachedPolygon[]): CachedPolygon | null {
   for (const p of polygons) {
     if (pointInRing(lat, lng, p.ring)) return p;
   }
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Determine which parking zone (if any) a coordinate falls within.
- * Blue zone is checked first since it is a subset of the Green zone area.
- */
 export function checkZone(lat: number, lng: number): ZoneResult {
   ensureLoaded();
+  const polygons = cachedPolygons!;
 
-  const blue = checkPolygons(lat, lng, bluePolygons!);
+  const blue = findPolygon(lat, lng, polygons.filter((p) => p.type === "blue"));
   if (blue) {
-    return {
-      zone: "blue",
-      subZone: blue.properties.name as string | undefined,
-      smsCode: blue.properties.smsCode as string | undefined,
-      hourlyRate: blue.properties.hourlyRate as number | undefined,
-    };
+    return { zone: "blue", subZone: blue.title };
   }
 
-  const green = checkPolygons(lat, lng, greenPolygons!);
+  const green = findPolygon(lat, lng, polygons.filter((p) => p.type === "green"));
   if (green) {
-    return {
-      zone: "green",
-      subZone: green.properties.name as string | undefined,
-      smsCode: green.properties.smsCode as string | undefined,
-      hourlyRate: green.properties.hourlyRate as number | undefined,
-    };
+    return { zone: "green", subZone: green.title };
   }
 
   return { zone: null };
 }
 
-/**
- * Returns the raw polygon rings for map rendering.
- * Each ring is an array of { latitude, longitude } (react-native-maps format).
- */
-export function getZonePolygons(): {
-  blue: { latitude: number; longitude: number }[][];
-  green: { latitude: number; longitude: number }[][];
-} {
+export interface ZonePolygon {
+  id: string;
+  title: string;
+  type: "blue" | "green";
+  color: string;
+  coordinates: { latitude: number; longitude: number }[];
+}
+
+export function getZonePolygons(): ZonePolygon[] {
   ensureLoaded();
-  return {
-    blue: (bluePolygons ?? []).map((p) =>
-      p.ring.map(({ lat, lng }) => ({ latitude: lat, longitude: lng })),
-    ),
-    green: (greenPolygons ?? []).map((p) =>
-      p.ring.map(({ lat, lng }) => ({ latitude: lat, longitude: lng })),
-    ),
-  };
+  return (cachedPolygons ?? []).map((p) => ({
+    id: p.id,
+    title: p.title,
+    type: p.type,
+    color: p.color,
+    coordinates: p.ring.map(({ lat, lng }) => ({ latitude: lat, longitude: lng })),
+  }));
+}
+
+export function getParkingMachines(): { lat: number; lng: number; title: string }[] {
+  return zoneData.machines;
+}
+
+export function getMapCenter(): { lat: number; lng: number } {
+  return zoneData.center;
 }

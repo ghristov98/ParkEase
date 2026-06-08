@@ -23,7 +23,7 @@ import {
 } from "react-native";
 import { MapView, Marker, Polygon } from "@/components/NativeMap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { checkZone, getZonePolygons, ZoneResult } from "@/services/ZoneService";
+import { checkZone, getZonePolygons, getParkingMachines, getMapCenter, ZoneResult, ZonePolygon } from "@/services/ZoneService";
 import LocationWatcher from "@/services/LocationWatcher";
 
 import { Badge } from "@/components/ui/Badge";
@@ -32,11 +32,13 @@ import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
+const MAP_CENTER = getMapCenter();
+
 const INITIAL_REGION = {
-  latitude: 42.7339,
-  longitude: 25.4858,
-  latitudeDelta: 5.0,
-  longitudeDelta: 5.0,
+  latitude: MAP_CENTER.lat,
+  longitude: MAP_CENTER.lng,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
 };
 
 const NEARBY_THRESHOLD_M = 300;
@@ -90,6 +92,7 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 const ZONE_POLYGONS = getZonePolygons();
+const PARKING_MACHINES = getParkingMachines();
 
 export default function MapScreen() {
   const [region, setRegion] = useState(INITIAL_REGION);
@@ -307,26 +310,36 @@ export default function MapScreen() {
         showsUserLocation={!!locationPermission}
         onLongPress={handleLongPress}
       >
-        {/* Blue Zone polygons */}
-        {showZones && ZONE_POLYGONS.blue.map((coords, i) => (
-          <Polygon
-            key={`blue-${i}`}
-            coordinates={coords}
-            fillColor="rgba(59,107,245,0.18)"
-            strokeColor="rgba(14,75,241,0.7)"
-            strokeWidth={2}
-          />
-        ))}
+        {/* Zone polygons */}
+        {showZones && ZONE_POLYGONS.map((z: ZonePolygon) => {
+          const fillColor = z.type === "blue"
+            ? "rgba(59,107,245,0.18)"
+            : "rgba(34,197,94,0.13)";
+          const strokeColor = z.type === "blue"
+            ? "rgba(14,75,241,0.7)"
+            : "rgba(34,197,94,0.7)";
+          return (
+            <Polygon
+              key={z.id}
+              coordinates={z.coordinates}
+              fillColor={fillColor}
+              strokeColor={strokeColor}
+              strokeWidth={2}
+            />
+          );
+        })}
 
-        {/* Green Zone polygons */}
-        {showZones && ZONE_POLYGONS.green.map((coords, i) => (
-          <Polygon
-            key={`green-${i}`}
-            coordinates={coords}
-            fillColor="rgba(34,197,94,0.13)"
-            strokeColor="rgba(34,197,94,0.7)"
-            strokeWidth={2}
-          />
+        {/* Parking machine markers */}
+        {showZones && PARKING_MACHINES.map((m, i) => (
+          <Marker
+            key={`machine-${i}`}
+            coordinate={{ latitude: m.lat, longitude: m.lng }}
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <View style={styles.machineMarker}>
+              <Text style={styles.machineEmoji}>💲</Text>
+            </View>
+          </Marker>
         ))}
 
         {parkingLots?.map((lot) => {
@@ -596,6 +609,17 @@ const styles = StyleSheet.create({
   },
   markerPhoto: { width: 36, height: 36, borderRadius: 18 },
   markerEmoji: { fontSize: 16 },
+  machineMarker: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FFF3E0",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#FF9800",
+  },
+  machineEmoji: { fontSize: 13 },
   pinEmoji: { fontSize: 32 },
   floatingSearch: { position: "absolute", left: 16, right: 16, zIndex: 10 },
   searchInput: { backgroundColor: "white", height: 50 },
