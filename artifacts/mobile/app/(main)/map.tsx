@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MapView, Marker, Polygon } from "@/components/NativeMap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { checkZone, getZonePolygons, getParkingMachines, getMapCenter, ZoneResult, ZonePolygon } from "@/services/ZoneService";
@@ -32,14 +33,104 @@ import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-const MAP_CENTER = getMapCenter();
+// ---------------------------------------------------------------------------
+// City config — easy to extend with more cities
+// ---------------------------------------------------------------------------
 
-const INITIAL_REGION = {
-  latitude: MAP_CENTER.lat,
-  longitude: MAP_CENTER.lng,
-  latitudeDelta: 0.05,
-  longitudeDelta: 0.05,
+interface CityConfig {
+  id: string;
+  label: string;
+  center: { latitude: number; longitude: number };
+  delta: { latitudeDelta: number; longitudeDelta: number };
+}
+
+const CITIES: CityConfig[] = [
+  {
+    id: "full",
+    label: "Full Map",
+    center: { latitude: 42.7339, longitude: 25.4858 },
+    delta: { latitudeDelta: 5.0, longitudeDelta: 5.0 },
+  },
+  {
+    id: "burgas",
+    label: "Burgas",
+    center: { latitude: 42.495278, longitude: 27.471667 },
+    delta: { latitudeDelta: 0.05, longitudeDelta: 0.05 },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Filter toggles
+// ---------------------------------------------------------------------------
+
+interface FilterState {
+  blueZone: boolean;
+  greenZone: boolean;
+  parkingMachines: boolean;
+  paidParking: boolean;
+  freeParking: boolean;
+  penaltyParking: boolean;
+}
+
+const DEFAULT_FILTERS: FilterState = {
+  blueZone: true,
+  greenZone: true,
+  parkingMachines: true,
+  paidParking: true,
+  freeParking: true,
+  penaltyParking: true,
 };
+
+// ---------------------------------------------------------------------------
+// Penalty marker
+// ---------------------------------------------------------------------------
+
+interface PenaltyMarker {
+  id: string;
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+  note: string;
+}
+
+const PENALTY_STORAGE_KEY = "parkease_penalty_markers";
+
+// ---------------------------------------------------------------------------
+// Memoized marker components
+// ---------------------------------------------------------------------------
+
+const ParkingLotMarker = React.memo(({ lot, colors, onPress }: any) => (
+  <Marker
+    coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
+    onPress={onPress}
+  >
+    <View style={[styles.marker, { backgroundColor: lot.type === "free" ? colors.parkingFree : colors.parkingPaid }]}>
+      <Text style={styles.markerEmoji}>🅿️</Text>
+    </View>
+  </Marker>
+));
+
+const MachineMarker = React.memo(({ lat, lng }: { lat: number; lng: number }) => (
+  <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 1 }}>
+    <View style={styles.machineMarker}>
+      <Text style={styles.machineEmoji}>💲</Text>
+    </View>
+  </Marker>
+));
+
+const PenaltyMarkerComponent = React.memo(({ marker, onPress }: { marker: PenaltyMarker; onPress: () => void }) => (
+  <Marker coordinate={{ latitude: marker.latitude, longitude: marker.longitude }} onPress={onPress}>
+    <View style={styles.penaltyMarkerView}>
+      <Text style={styles.penaltyEmoji}>⚠️</Text>
+    </View>
+  </Marker>
+));
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MAP_CENTER = getMapCenter();
 
 const NEARBY_THRESHOLD_M = 300;
 
@@ -94,8 +185,17 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
 const ZONE_POLYGONS = getZonePolygons();
 const PARKING_MACHINES = getParkingMachines();
 
+// ---------------------------------------------------------------------------
+// Main screen
+// ---------------------------------------------------------------------------
+
 export default function MapScreen() {
-  const [region, setRegion] = useState(INITIAL_REGION);
+  const [region, setRegion] = useState({
+    latitude: MAP_CENTER.lat,
+    longitude: MAP_CENTER.lng,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
   const [search, setSearch] = useState("");
   const [selectedLot, setSelectedLot] = useState<any>(null);
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
@@ -104,8 +204,21 @@ export default function MapScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [zoneResult, setZoneResult] = useState<ZoneResult>({ zone: null });
-  const [showZones, setShowZones] = useState(true);
   const bannerAnim = useRef(new Animated.Value(0)).current;
+
+  // City selector
+  const [selectedCity, setSelectedCity] = useState("burgas");
+
+  // Filter panel
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterAnim = useRef(new Animated.Value(0)).current;
+
+  // Penalty markers (superadmin)
+  const [penaltyMarkers, setPenaltyMarkers] = useState<PenaltyMarker[]>([]);
+  const [penaltyMode, setPenaltyMode] = useState(false);
+  const [selectedPenalty, setSelectedPenalty] = useState<PenaltyMarker | null>(null);
+  const [penaltyNote, setPenaltyNote] = useState("");
 
   const { user, accessToken } = useAuth();
   const colors = useColors();
@@ -114,9 +227,76 @@ export default function MapScreen() {
   const queryClient = useQueryClient();
   const createMutation = useCreateParkingLot();
   const deleteMutation = useDeleteParkingLot();
+  const isSuperAdmin = user?.role === "superadmin";
 
   const { data: parkingLots } = useQuery(
     getGetParkingLotsQueryOptions({ search: search || undefined })
+  );
+
+  // Load penalty markers from storage
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(PENALTY_STORAGE_KEY);
+        if (stored) setPenaltyMarkers(JSON.parse(stored));
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  const savePenaltyMarkers = useCallback(async (markers: PenaltyMarker[]) => {
+    setPenaltyMarkers(markers);
+    try {
+      await AsyncStorage.setItem(PENALTY_STORAGE_KEY, JSON.stringify(markers));
+    } catch { /* ignore */ }
+  }, []);
+
+  // Filter panel animation
+  useEffect(() => {
+    Animated.spring(filterAnim, {
+      toValue: filterOpen ? 1 : 0,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 12,
+    }).start();
+  }, [filterOpen]);
+
+  // City change — animate map to new region
+  const handleCityChange = useCallback((cityId: string) => {
+    setSelectedCity(cityId);
+    const city = CITIES.find((c) => c.id === cityId);
+    if (city) {
+      setRegion({
+        latitude: city.center.latitude,
+        longitude: city.center.longitude,
+        latitudeDelta: city.delta.latitudeDelta,
+        longitudeDelta: city.delta.longitudeDelta,
+      });
+    }
+  }, []);
+
+  // Filtered data using useMemo
+  const filteredZones = useMemo(() =>
+    ZONE_POLYGONS.filter((z) =>
+      z.type === "blue" ? filters.blueZone : z.type === "green" ? filters.greenZone : false
+    ),
+    [filters.blueZone, filters.greenZone]
+  );
+
+  const filteredMachines = useMemo(() =>
+    filters.parkingMachines ? PARKING_MACHINES : [],
+    [filters.parkingMachines]
+  );
+
+  const filteredParkingLots = useMemo(() =>
+    (parkingLots ?? []).filter((lot: any) =>
+      lot.type === "free" ? filters.freeParking : lot.type === "paid" ? filters.paidParking : true
+    ),
+    [parkingLots, filters.freeParking, filters.paidParking]
+  );
+
+  const filteredPenaltyMarkers = useMemo(() =>
+    isSuperAdmin && filters.penaltyParking ? penaltyMarkers : [],
+    [isSuperAdmin, filters.penaltyParking, penaltyMarkers]
   );
 
   useEffect(() => {
@@ -141,7 +321,6 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // Subscribe to live GPS zone updates
   useEffect(() => {
     if (Platform.OS === "web") return;
     const watcher = LocationWatcher.getInstance();
@@ -154,7 +333,6 @@ export default function MapScreen() {
     };
   }, []);
 
-  // Animate zone banner in/out when zone changes
   useEffect(() => {
     Animated.spring(bannerAnim, {
       toValue: zoneResult.zone ? 1 : 0,
@@ -166,16 +344,51 @@ export default function MapScreen() {
 
   const nearbyLot = longPressCoord
     ? (parkingLots ?? []).find(
-        (lot) => getDistanceMeters(longPressCoord.latitude, longPressCoord.longitude, lot.latitude, lot.longitude) <= NEARBY_THRESHOLD_M
+        (lot: any) => getDistanceMeters(longPressCoord.latitude, longPressCoord.longitude, lot.latitude, lot.longitude) <= NEARBY_THRESHOLD_M
       ) ?? null
     : null;
 
-  const handleLongPress = (e: any) => {
-    if (user?.role !== "superadmin") return;
-    setLongPressCoord(e.nativeEvent.coordinate);
+  const handleLongPress = useCallback((e: any) => {
+    if (!isSuperAdmin) return;
+    const coord = e.nativeEvent.coordinate;
+
+    if (penaltyMode) {
+      const newMarker: PenaltyMarker = {
+        id: `penalty-${Date.now()}`,
+        latitude: coord.latitude,
+        longitude: coord.longitude,
+        timestamp: Date.now(),
+        note: "",
+      };
+      savePenaltyMarkers([...penaltyMarkers, newMarker]);
+      return;
+    }
+
+    setLongPressCoord(coord);
     setAddForm(DEFAULT_FORM);
     setSelectedLot(null);
-  };
+  }, [isSuperAdmin, penaltyMode, penaltyMarkers, savePenaltyMarkers]);
+
+  const handlePenaltyPress = useCallback((marker: PenaltyMarker) => {
+    setSelectedPenalty(marker);
+    setPenaltyNote(marker.note);
+  }, []);
+
+  const handleSavePenaltyNote = useCallback(() => {
+    if (!selectedPenalty) return;
+    const updated = penaltyMarkers.map((m) =>
+      m.id === selectedPenalty.id ? { ...m, note: penaltyNote } : m
+    );
+    savePenaltyMarkers(updated);
+    setSelectedPenalty(null);
+  }, [selectedPenalty, penaltyNote, penaltyMarkers, savePenaltyMarkers]);
+
+  const handleDeletePenalty = useCallback(() => {
+    if (!selectedPenalty) return;
+    const updated = penaltyMarkers.filter((m) => m.id !== selectedPenalty.id);
+    savePenaltyMarkers(updated);
+    setSelectedPenalty(null);
+  }, [selectedPenalty, penaltyMarkers, savePenaltyMarkers]);
 
   const pickPhotos = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -223,12 +436,10 @@ export default function MapScreen() {
         } as any,
       });
 
-      // Upload photos sequentially
       if (addForm.photos.length > 0) {
         for (const uri of addForm.photos) {
           await uploadPhoto(lot.id, uri);
         }
-        // If main photo is not the first uploaded, update it
         if (addForm.mainPhotoIndex !== 0) {
           await fetch(`${BASE_URL}/api/parking/${lot.id}`, {
             method: "PUT",
@@ -273,6 +484,10 @@ export default function MapScreen() {
     setAddForm((f) => ({ ...f, amenities: { ...f.amenities, [key]: !f.amenities[key] } }));
   };
 
+  const toggleFilter = (key: keyof FilterState) => {
+    setFilters((f) => ({ ...f, [key]: !f[key] }));
+  };
+
   if (Platform.OS === "web") {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -311,7 +526,7 @@ export default function MapScreen() {
         onLongPress={handleLongPress}
       >
         {/* Zone polygons */}
-        {showZones && ZONE_POLYGONS.map((z: ZonePolygon) => {
+        {filteredZones.map((z: ZonePolygon) => {
           const fillColor = z.type === "blue"
             ? "rgba(59,107,245,0.18)"
             : "rgba(34,197,94,0.13)";
@@ -330,31 +545,29 @@ export default function MapScreen() {
         })}
 
         {/* Parking machine markers */}
-        {showZones && PARKING_MACHINES.map((m, i) => (
-          <Marker
-            key={`machine-${i}`}
-            coordinate={{ latitude: m.lat, longitude: m.lng }}
-            anchor={{ x: 0.5, y: 1 }}
-          >
-            <View style={styles.machineMarker}>
-              <Text style={styles.machineEmoji}>💲</Text>
-            </View>
-          </Marker>
+        {filteredMachines.map((m: { lat: number; lng: number; title: string }, i: number) => (
+          <MachineMarker key={`machine-${i}`} lat={m.lat} lng={m.lng} />
         ))}
 
-        {parkingLots?.map((lot) => {
-          return (
-            <Marker
-              key={lot.id}
-              coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
-              onPress={() => { setSelectedLot(lot); setLongPressCoord(null); }}
-            >
-              <View style={[styles.marker, { backgroundColor: lot.type === "free" ? colors.parkingFree : colors.parkingPaid }]}>
-                <Text style={styles.markerEmoji}>🅿️</Text>
-              </View>
-            </Marker>
-          );
-        })}
+        {/* Parking lot markers */}
+        {filteredParkingLots.map((lot: any) => (
+          <ParkingLotMarker
+            key={lot.id}
+            lot={lot}
+            colors={colors}
+            onPress={() => { setSelectedLot(lot); setLongPressCoord(null); }}
+          />
+        ))}
+
+        {/* Penalty markers */}
+        {filteredPenaltyMarkers.map((marker) => (
+          <PenaltyMarkerComponent
+            key={marker.id}
+            marker={marker}
+            onPress={() => handlePenaltyPress(marker)}
+          />
+        ))}
+
         {longPressCoord && (
           <Marker coordinate={longPressCoord} anchor={{ x: 0.5, y: 1 }}>
             <Text style={styles.pinEmoji}>📍</Text>
@@ -362,9 +575,96 @@ export default function MapScreen() {
         )}
       </MapView>
 
+      {/* Floating search + city selector */}
       <View style={[styles.floatingSearch, { top: insets.top + 10 }]}>
-        <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIconText="🔍" style={styles.searchInput} />
+        <View style={styles.searchRow}>
+          <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIconText="🔍" style={[styles.searchInput, { flex: 1 }]} />
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: colors.card }]}
+            onPress={() => setFilterOpen((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.filterBtnEmoji}>☰</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* City selector segmented control */}
+        <View style={[styles.citySelector, { backgroundColor: colors.card }]}>
+          {CITIES.map((city) => (
+            <TouchableOpacity
+              key={city.id}
+              style={[
+                styles.citySegment,
+                selectedCity === city.id && { backgroundColor: colors.primary },
+              ]}
+              onPress={() => handleCityChange(city.id)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.citySegmentText,
+                  { color: selectedCity === city.id ? "#FFF" : colors.foreground },
+                ]}
+              >
+                {city.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
+
+      {/* Filter panel — animated slide-in */}
+      <Animated.View
+        style={[
+          styles.filterPanel,
+          {
+            top: insets.top + 122,
+            transform: [{
+              translateX: filterAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [320, 0],
+              }),
+            }],
+            opacity: filterAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 1],
+            }),
+          },
+        ]}
+        pointerEvents={filterOpen ? "auto" : "none"}
+      >
+        <Card padding={false}>
+          <View style={styles.filterPanelInner}>
+            <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>Filters</Text>
+
+            <FilterToggle label="🔵 Blue Zone" active={filters.blueZone} onPress={() => toggleFilter("blueZone")} />
+            <FilterToggle label="🟢 Green Zone" active={filters.greenZone} onPress={() => toggleFilter("greenZone")} />
+            <FilterToggle label="🅿️ Parking Machines" active={filters.parkingMachines} onPress={() => toggleFilter("parkingMachines")} />
+            <FilterToggle label="💳 Paid Parking" active={filters.paidParking} onPress={() => toggleFilter("paidParking")} />
+            <FilterToggle label="🆓 Free Parking" active={filters.freeParking} onPress={() => toggleFilter("freeParking")} />
+
+            {/* Penalty toggle — superadmin only */}
+            {isSuperAdmin && (
+              <>
+                <View style={[styles.filterDivider, { backgroundColor: colors.border }]} />
+                <FilterToggle label="🚫 Penalty Parking" active={filters.penaltyParking} onPress={() => toggleFilter("penaltyParking")} />
+                <TouchableOpacity
+                  style={[
+                    styles.penaltyModeBtn,
+                    { borderColor: penaltyMode ? "#EF4444" : colors.border, backgroundColor: penaltyMode ? "#FEF2F2" : colors.muted },
+                  ]}
+                  onPress={() => setPenaltyMode((v) => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.penaltyModeText, { color: penaltyMode ? "#DC2626" : colors.foreground }]}>
+                    {penaltyMode ? "⚠️ Penalty Mode ON" : "Place Penalty Marker"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </Card>
+      </Animated.View>
 
       {/* Zone banner — slides in when user is in a zone */}
       <Animated.View
@@ -398,17 +698,7 @@ export default function MapScreen() {
         </View>
       </Animated.View>
 
-      <Card style={{ ...styles.legend, top: insets.top + 80 }}>
-        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.parkingFree }]} /><Text style={styles.legendText}>Free</Text></View>
-        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.parkingPaid }]} /><Text style={styles.legendText}>Paid</Text></View>
-        <View style={[styles.legendDivider, { backgroundColor: colors.border }]} />
-        <TouchableOpacity onPress={() => setShowZones((v) => !v)} style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#3B6BF5", opacity: showZones ? 1 : 0.3 }]} />
-          <Text style={[styles.legendText, { opacity: showZones ? 1 : 0.5 }]}>Zones</Text>
-        </TouchableOpacity>
-      </Card>
-
-      {selectedLot && !longPressCoord && (
+      {selectedLot && !longPressCoord && !selectedPenalty && (
         <View style={[styles.bottomSheet, { bottom: 100 + insets.bottom }]}>
           <Card padding={false}>
             <TouchableOpacity onPress={() => setSelectedLot(null)} style={styles.closeButton}>
@@ -429,11 +719,66 @@ export default function MapScreen() {
         </View>
       )}
 
-      {user?.role === "superadmin" && (
+      {isSuperAdmin && (
         <TouchableOpacity style={[styles.adminFab, { bottom: 100 + insets.bottom, backgroundColor: colors.primary }]} onPress={() => router.push("/admin")}>
           <Text style={styles.fabEmoji}>⚙️</Text>
         </TouchableOpacity>
       )}
+
+      {/* Penalty marker info modal */}
+      <Modal visible={!!selectedPenalty} transparent animationType="fade" onRequestClose={() => setSelectedPenalty(null)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setSelectedPenalty(null)} />
+        <View style={[styles.penaltyModal, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+          <View style={styles.bubbleHandle} />
+          <View style={styles.penaltyModalHeader}>
+            <Text style={styles.penaltyEmojiLarge}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bubbleTitle, { color: colors.foreground }]}>Penalty Marker</Text>
+              {selectedPenalty && (
+                <Text style={[styles.bubbleCoords, { color: colors.mutedForeground }]}>
+                  {selectedPenalty.latitude.toFixed(4)}, {selectedPenalty.longitude.toFixed(4)}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={() => setSelectedPenalty(null)}>
+              <Text style={[styles.closeEmoji, { color: colors.mutedForeground }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+              Placed: {selectedPenalty ? new Date(selectedPenalty.timestamp).toLocaleString() : ""}
+            </Text>
+            <Input
+              label="Note"
+              placeholder="Add a note about this penalty..."
+              value={penaltyNote}
+              onChangeText={setPenaltyNote}
+              multiline
+            />
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+              onPress={handleSavePenaltyNote}
+            >
+              <Text style={styles.saveBtnText}>Save Note</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.removeSection, { borderTopColor: colors.border }]}>
+            <TouchableOpacity
+              style={[styles.removeBtn, { borderColor: "#EF4444" }]}
+              onPress={handleDeletePenalty}
+            >
+              <Text style={[styles.removeBtnText, { color: "#EF4444" }]}>
+                🗑️ Remove Penalty Marker
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Long-press bubble — superadmin only */}
       <Modal visible={!!longPressCoord} transparent animationType="slide" onRequestClose={() => setLongPressCoord(null)}>
@@ -441,7 +786,6 @@ export default function MapScreen() {
         <View style={[styles.bubble, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.bubbleHandle} />
 
-          {/* Header */}
           <View style={styles.bubbleHeader}>
             <Text style={styles.bubblePin}>📍</Text>
             <View style={{ flex: 1 }}>
@@ -460,7 +804,6 @@ export default function MapScreen() {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 520 }}>
-            {/* Name + Type */}
             <View style={styles.section}>
               <Input
                 label="Parking Lot Name"
@@ -484,7 +827,6 @@ export default function MapScreen() {
               </View>
             </View>
 
-            {/* Working Hours */}
             <View style={styles.section}>
               <Input
                 label="⏰  Opening Hours"
@@ -494,7 +836,6 @@ export default function MapScreen() {
               />
             </View>
 
-            {/* Photos */}
             <View style={styles.section}>
               <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>📸  Photos</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
@@ -531,7 +872,6 @@ export default function MapScreen() {
               )}
             </View>
 
-            {/* Amenities */}
             <View style={styles.section}>
               <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>🏷️  Amenities</Text>
               <View style={styles.amenityGrid}>
@@ -555,7 +895,6 @@ export default function MapScreen() {
               </View>
             </View>
 
-            {/* Save button */}
             <View style={[styles.section, { paddingBottom: 4 }]}>
               <TouchableOpacity
                 style={[styles.saveBtn, { backgroundColor: colors.primary }, (!addForm.name.trim() || isSaving) && { opacity: 0.5 }]}
@@ -566,7 +905,6 @@ export default function MapScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Remove nearby lot */}
             {nearbyLot && (
               <View style={[styles.removeSection, { borderTopColor: colors.border }]}>
                 <Text style={[styles.removeLabel, { color: colors.mutedForeground }]}>
@@ -589,6 +927,31 @@ export default function MapScreen() {
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Filter toggle sub-component
+// ---------------------------------------------------------------------------
+
+function FilterToggle({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={styles.filterToggleRow}
+      onPress={onPress}
+      activeOpacity={0.6}
+    >
+      <Text style={[styles.filterToggleLabel, { opacity: active ? 1 : 0.45 }]}>
+        {label}
+      </Text>
+      <View style={[styles.filterToggleSwitch, active && styles.filterToggleSwitchOn]}>
+        <View style={[styles.filterToggleKnob, active && styles.filterToggleKnobOn]} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -620,9 +983,152 @@ const styles = StyleSheet.create({
     borderColor: "#FF9800",
   },
   machineEmoji: { fontSize: 13 },
+  penaltyMarkerView: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#EF4444",
+    shadowColor: "#EF4444",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  penaltyEmoji: { fontSize: 16 },
+  penaltyEmojiLarge: { fontSize: 28 },
   pinEmoji: { fontSize: 32 },
+  searchRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  filterBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E2E7F5",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  filterBtnEmoji: { fontSize: 22 },
   floatingSearch: { position: "absolute", left: 16, right: 16, zIndex: 10 },
   searchInput: { backgroundColor: "white", height: 50 },
+  citySelector: {
+    flexDirection: "row",
+    marginTop: 8,
+    borderRadius: 10,
+    padding: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#E2E7F5",
+  },
+  citySegment: {
+    flex: 1,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  citySegmentText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  filterPanel: {
+    position: "absolute",
+    right: 16,
+    width: 220,
+    zIndex: 12,
+  },
+  filterPanelInner: {
+    padding: 14,
+    gap: 2,
+  },
+  filterPanelTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  filterDivider: {
+    height: 1,
+    marginVertical: 6,
+  },
+  filterToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+  },
+  filterToggleLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  filterToggleSwitch: {
+    width: 36,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#D1D5DB",
+    padding: 2,
+    justifyContent: "center",
+  },
+  filterToggleSwitchOn: {
+    backgroundColor: "#3B6BF5",
+  },
+  filterToggleKnob: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "white",
+  },
+  filterToggleKnobOn: {
+    alignSelf: "flex-end",
+  },
+  penaltyModeBtn: {
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+  },
+  penaltyModeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  penaltyModal: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  penaltyModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 4,
+    gap: 12,
+  },
   legend: { position: "absolute", right: 16, width: 86, zIndex: 10, padding: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
@@ -671,7 +1177,6 @@ const styles = StyleSheet.create({
   webList: { padding: 16, gap: 12 },
   lotCard: { marginBottom: 4 },
   empty: { padding: 40, alignItems: "center" },
-  // Modal
   modalBackdrop: { flex: 1 },
   bubble: {
     borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12,
@@ -687,7 +1192,6 @@ const styles = StyleSheet.create({
   typeRow: { flexDirection: "row", gap: 10 },
   typeBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   typeBtnText: { fontWeight: "600", fontSize: 15 },
-  // Photos
   photoRow: { gap: 10, paddingVertical: 4 },
   photoThumbWrap: { position: "relative" },
   photoThumb: { width: 80, height: 80, borderRadius: 10 },
@@ -709,7 +1213,6 @@ const styles = StyleSheet.create({
   addPhotoBtnText: { fontSize: 20 },
   addPhotoBtnLabel: { fontSize: 10, fontWeight: "600" },
   mainPhotoHint: { fontSize: 11, marginTop: -4 },
-  // Amenities
   amenityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   amenityChip: {
     flexDirection: "row", alignItems: "center", gap: 4,
@@ -718,10 +1221,8 @@ const styles = StyleSheet.create({
   amenityEmoji: { fontSize: 14 },
   amenityLabel: { fontSize: 12, fontWeight: "600" },
   amenityCheck: { fontSize: 12, fontWeight: "800" },
-  // Save
   saveBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   saveBtnText: { color: "white", fontWeight: "700", fontSize: 16 },
-  // Remove
   removeSection: {
     marginTop: 12, paddingTop: 14, paddingHorizontal: 20, paddingBottom: 8,
     borderTopWidth: StyleSheet.hairlineWidth, gap: 10,
