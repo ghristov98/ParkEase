@@ -33,6 +33,8 @@ import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
+const PARKING_PIN = require("@/assets/images/image.png");
+
 // ---------------------------------------------------------------------------
 // City config — easy to extend with more cities
 // ---------------------------------------------------------------------------
@@ -99,14 +101,13 @@ const PENALTY_STORAGE_KEY = "parkease_penalty_markers";
 // Memoized marker components
 // ---------------------------------------------------------------------------
 
-const ParkingLotMarker = React.memo(({ lot, colors, onPress }: any) => (
+const ParkingLotMarker = React.memo(({ lot, onPress }: any) => (
   <Marker
     coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
     onPress={onPress}
+    anchor={{ x: 0.5, y: 1 }}
   >
-    <View style={[styles.marker, { backgroundColor: lot.type === "free" ? colors.parkingFree : colors.parkingPaid }]}>
-      <Text style={styles.markerEmoji}>🅿️</Text>
-    </View>
+    <Image source={PARKING_PIN} style={styles.parkingPinImage} resizeMode="contain" />
   </Marker>
 ));
 
@@ -150,6 +151,7 @@ type AmenityKey = typeof AMENITIES[number]["key"];
 interface AddForm {
   name: string;
   type: "free" | "paid";
+  description: string;
   openingHours: string;
   amenities: Record<AmenityKey, boolean>;
   photos: string[];
@@ -159,6 +161,7 @@ interface AddForm {
 const DEFAULT_FORM: AddForm = {
   name: "",
   type: "free",
+  description: "",
   openingHours: "",
   amenities: {
     hasSecurityGuard: false,
@@ -184,6 +187,18 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 const ZONE_POLYGONS = getZonePolygons();
 const PARKING_MACHINES = getParkingMachines();
+
+// Find the closest named city (excludes "full") to a GPS position
+function detectCity(lat: number, lng: number): CityConfig {
+  const named = CITIES.filter((c) => c.id !== "full");
+  let best = named[0];
+  let bestDist = Infinity;
+  for (const city of named) {
+    const d = getDistanceMeters(lat, lng, city.center.latitude, city.center.longitude);
+    if (d < bestDist) { bestDist = d; best = city; }
+  }
+  return best;
+}
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -307,13 +322,17 @@ export default function MapScreen() {
         if (status === "granted") {
           try {
             const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const { latitude, longitude } = location.coords;
+            // Auto-select the city the user is currently in
+            const nearestCity = detectCity(latitude, longitude);
+            setSelectedCity(nearestCity.id);
             setRegion({
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
+              latitude,
+              longitude,
+              latitudeDelta: nearestCity.delta.latitudeDelta,
+              longitudeDelta: nearestCity.delta.longitudeDelta,
             });
-            const initial = checkZone(location.coords.latitude, location.coords.longitude);
+            const initial = checkZone(latitude, longitude);
             setZoneResult(initial);
           } catch { /* keep default */ }
         }
@@ -430,7 +449,7 @@ export default function MapScreen() {
           latitude: longPressCoord.latitude,
           longitude: longPressCoord.longitude,
           type: addForm.type,
-          description: addForm.openingHours ? `Hours: ${addForm.openingHours}` : "",
+          description: addForm.description.trim() || undefined,
           ...addForm.amenities,
           openingHours: addForm.openingHours || undefined,
         } as any,
@@ -554,7 +573,6 @@ export default function MapScreen() {
           <ParkingLotMarker
             key={lot.id}
             lot={lot}
-            colors={colors}
             onPress={() => { setSelectedLot(lot); setLongPressCoord(null); }}
           />
         ))}
@@ -829,6 +847,16 @@ export default function MapScreen() {
 
             <View style={styles.section}>
               <Input
+                label="📝  Description"
+                placeholder="e.g. Underground parking, max height 2m..."
+                value={addForm.description}
+                onChangeText={(t) => setAddForm((f) => ({ ...f, description: t }))}
+                multiline
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Input
                 label="⏰  Opening Hours"
                 placeholder="e.g. Mon–Fri 08:00–20:00, Sat–Sun 09:00–18:00"
                 value={addForm.openingHours}
@@ -970,6 +998,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     overflow: "hidden",
   },
+  parkingPinImage: { width: 44, height: 52 },
   markerPhoto: { width: 36, height: 36, borderRadius: 18 },
   markerEmoji: { fontSize: 16 },
   machineMarker: {
