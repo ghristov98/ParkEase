@@ -49,6 +49,7 @@ export function Input({
             backgroundColor: colors.card,
             borderColor: error ? colors.destructive : isFocused ? colors.primary : colors.border,
           },
+          props.multiline && { height: undefined, minHeight: 52, alignItems: "flex-start", paddingVertical: 10 },
         ]}
       >
         {leftIconText ? (
@@ -65,9 +66,10 @@ export function Input({
           style={[
             styles.input,
             { color: colors.foreground },
-            props.multiline && { height: 100, textAlignVertical: "top", paddingTop: 12 },
+            props.multiline && { height: undefined, minHeight: 80, textAlignVertical: "top" },
             style,
           ]}
+          scrollEnabled={props.multiline}
           placeholderTextColor={colors.mutedForeground}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}

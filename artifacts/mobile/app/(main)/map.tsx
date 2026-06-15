@@ -77,7 +77,7 @@ interface FilterState {
 const DEFAULT_FILTERS: FilterState = {
   blueZone: true,
   greenZone: true,
-  parkingMachines: true,
+  parkingMachines: false,
   paidParking: true,
   freeParking: true,
   penaltyParking: true,
@@ -229,6 +229,9 @@ export default function MapScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
   const filterAnim = useRef(new Animated.Value(0)).current;
 
+  // Nearby machines mode — set when user taps a zone and agrees to see machines
+  const [nearbyMachinesCoord, setNearbyMachinesCoord] = useState<{ latitude: number; longitude: number } | null>(null);
+
   // Penalty markers (superadmin)
   const [penaltyMarkers, setPenaltyMarkers] = useState<PenaltyMarker[]>([]);
   const [penaltyMode, setPenaltyMode] = useState(false);
@@ -297,10 +300,14 @@ export default function MapScreen() {
     [filters.blueZone, filters.greenZone]
   );
 
-  const filteredMachines = useMemo(() =>
-    filters.parkingMachines ? PARKING_MACHINES : [],
-    [filters.parkingMachines]
-  );
+  const filteredMachines = useMemo(() => {
+    if (nearbyMachinesCoord) {
+      return PARKING_MACHINES.filter((m) =>
+        getDistanceMeters(nearbyMachinesCoord.latitude, nearbyMachinesCoord.longitude, m.lat, m.lng) <= 500
+      );
+    }
+    return filters.parkingMachines ? PARKING_MACHINES : [];
+  }, [filters.parkingMachines, nearbyMachinesCoord]);
 
   const filteredParkingLots = useMemo(() =>
     (parkingLots ?? []).filter((lot: any) =>
@@ -507,6 +514,20 @@ export default function MapScreen() {
     setFilters((f) => ({ ...f, [key]: !f[key] }));
   };
 
+  const handleZonePress = useCallback((coord: { latitude: number; longitude: number }) => {
+    Alert.alert(
+      "Parking Machines Nearby",
+      "Would you like to see parking machines near this location?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes",
+          onPress: () => setNearbyMachinesCoord(coord),
+        },
+      ]
+    );
+  }, []);
+
   if (Platform.OS === "web") {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -559,6 +580,8 @@ export default function MapScreen() {
               fillColor={fillColor}
               strokeColor={strokeColor}
               strokeWidth={2}
+              tappable
+              onPress={(e: any) => handleZonePress(e.nativeEvent.coordinate)}
             />
           );
         })}
@@ -683,6 +706,16 @@ export default function MapScreen() {
           </View>
         </Card>
       </Animated.View>
+
+      {/* Nearby machines active banner */}
+      {nearbyMachinesCoord && (
+        <View style={[styles.nearbyMachinesBanner, { bottom: 100 + insets.bottom }]}>
+          <Text style={styles.nearbyMachinesText}>💲 Showing nearby machines</Text>
+          <TouchableOpacity onPress={() => setNearbyMachinesCoord(null)} style={styles.nearbyMachinesClear}>
+            <Text style={styles.nearbyMachinesClearText}>✕ Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Zone banner — slides in when user is in a zone */}
       <Animated.View
@@ -861,6 +894,7 @@ export default function MapScreen() {
                 placeholder="e.g. Mon–Fri 08:00–20:00, Sat–Sun 09:00–18:00"
                 value={addForm.openingHours}
                 onChangeText={(t) => setAddForm((f) => ({ ...f, openingHours: t }))}
+                multiline
               />
             </View>
 
@@ -1259,4 +1293,32 @@ const styles = StyleSheet.create({
   removeLabel: { fontSize: 13 },
   removeBtn: { height: 46, borderRadius: 12, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   removeBtnText: { fontWeight: "700", fontSize: 15 },
+  nearbyMachinesBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF8E1",
+    borderWidth: 1.5,
+    borderColor: "#FF9800",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  nearbyMachinesText: { fontSize: 13, fontWeight: "600", color: "#E65100" },
+  nearbyMachinesClear: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: "#FF9800",
+    borderRadius: 8,
+  },
+  nearbyMachinesClearText: { fontSize: 12, fontWeight: "700", color: "white" },
 });
