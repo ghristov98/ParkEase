@@ -1,5 +1,6 @@
 import {
   getGetParkingLotsQueryOptions,
+  getGetVehiclesQueryOptions,
   useCreateParkingLot,
   useDeleteParkingLot,
 } from "@workspace/api-client-react";
@@ -66,20 +67,16 @@ const CITIES: CityConfig[] = [
 // ---------------------------------------------------------------------------
 
 interface FilterState {
-  blueZone: boolean;
-  greenZone: boolean;
-  parkingMachines: boolean;
-  paidParking: boolean;
+  zones: boolean;
   freeParking: boolean;
+  paidParking: boolean;
   penaltyParking: boolean;
 }
 
 const DEFAULT_FILTERS: FilterState = {
-  blueZone: true,
-  greenZone: true,
-  parkingMachines: false,
-  paidParking: true,
+  zones: true,
   freeParking: true,
+  paidParking: true,
   penaltyParking: true,
 };
 
@@ -251,6 +248,13 @@ export default function MapScreen() {
     getGetParkingLotsQueryOptions({ search: search || undefined })
   );
 
+  const { data: userVehicles } = useQuery(getGetVehiclesQueryOptions());
+
+  const vehicleMarkers = useMemo(() =>
+    (userVehicles ?? []).filter((v: any) => v.latitude != null && v.longitude != null),
+    [userVehicles]
+  );
+
   // Load penalty markers from storage
   useEffect(() => {
     (async () => {
@@ -294,10 +298,8 @@ export default function MapScreen() {
 
   // Filtered data using useMemo
   const filteredZones = useMemo(() =>
-    ZONE_POLYGONS.filter((z) =>
-      z.type === "blue" ? filters.blueZone : z.type === "green" ? filters.greenZone : false
-    ),
-    [filters.blueZone, filters.greenZone]
+    filters.zones ? ZONE_POLYGONS : [],
+    [filters.zones]
   );
 
   const filteredMachines = useMemo(() => {
@@ -306,15 +308,22 @@ export default function MapScreen() {
         getDistanceMeters(nearbyMachinesCoord.latitude, nearbyMachinesCoord.longitude, m.lat, m.lng) <= 500
       );
     }
-    return filters.parkingMachines ? PARKING_MACHINES : [];
-  }, [filters.parkingMachines, nearbyMachinesCoord]);
+    return filters.paidParking ? PARKING_MACHINES : [];
+  }, [filters.paidParking, nearbyMachinesCoord]);
 
-  const filteredParkingLots = useMemo(() =>
-    (parkingLots ?? []).filter((lot: any) =>
+  const filteredParkingLots = useMemo(() => {
+    const lots = (parkingLots ?? []) as any[];
+    const cityFiltered = selectedCity === "full"
+      ? lots
+      : lots.filter((lot: any) => {
+          const city = CITIES.find((c) => c.id === selectedCity);
+          if (!city || lot.latitude == null || lot.longitude == null) return true;
+          return getDistanceMeters(lot.latitude, lot.longitude, city.center.latitude, city.center.longitude) <= 50000;
+        });
+    return cityFiltered.filter((lot: any) =>
       lot.type === "free" ? filters.freeParking : lot.type === "paid" ? filters.paidParking : true
-    ),
-    [parkingLots, filters.freeParking, filters.paidParking]
-  );
+    );
+  }, [parkingLots, filters.freeParking, filters.paidParking, selectedCity]);
 
   const filteredPenaltyMarkers = useMemo(() =>
     isSuperAdmin && filters.penaltyParking ? penaltyMarkers : [],
@@ -600,6 +609,15 @@ export default function MapScreen() {
           />
         ))}
 
+        {/* Vehicle location markers */}
+        {vehicleMarkers.map((v: any) => (
+          <Marker key={`vehicle-${v.id}`} coordinate={{ latitude: v.latitude, longitude: v.longitude }} anchor={{ x: 0.5, y: 1 }}>
+            <View style={styles.carMarker}>
+              <Text style={styles.carMarkerEmoji}>🚗</Text>
+            </View>
+          </Marker>
+        ))}
+
         {/* Penalty markers */}
         {filteredPenaltyMarkers.map((marker) => (
           <PenaltyMarkerComponent
@@ -678,11 +696,9 @@ export default function MapScreen() {
           <View style={styles.filterPanelInner}>
             <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>Filters</Text>
 
-            <FilterToggle label="🔵 Blue Zone" active={filters.blueZone} onPress={() => toggleFilter("blueZone")} />
-            <FilterToggle label="🟢 Green Zone" active={filters.greenZone} onPress={() => toggleFilter("greenZone")} />
-            <FilterToggle label="🅿️ Parking Machines" active={filters.parkingMachines} onPress={() => toggleFilter("parkingMachines")} />
-            <FilterToggle label="💳 Paid Parking" active={filters.paidParking} onPress={() => toggleFilter("paidParking")} />
+            <FilterToggle label="🔵🟢 Zones" active={filters.zones} onPress={() => toggleFilter("zones")} />
             <FilterToggle label="🆓 Free Parking" active={filters.freeParking} onPress={() => toggleFilter("freeParking")} />
+            <FilterToggle label="💳 Paid Parking" active={filters.paidParking} onPress={() => toggleFilter("paidParking")} />
 
             {/* Penalty toggle — superadmin only */}
             {isSuperAdmin && (
@@ -1313,6 +1329,22 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
+  carMarker: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EEF3FF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2.5,
+    borderColor: "#3B6BF5",
+    shadowColor: "#3B6BF5",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  carMarkerEmoji: { fontSize: 18 },
   nearbyMachinesText: { fontSize: 13, fontWeight: "600", color: "#E65100" },
   nearbyMachinesClear: {
     paddingHorizontal: 10,

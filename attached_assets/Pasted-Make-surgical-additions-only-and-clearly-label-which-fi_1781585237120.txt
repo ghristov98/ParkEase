@@ -1,0 +1,69 @@
+Make surgical additions only and clearly label which files are new and which are modified. Ask me for any existing files you need before making changes.
+
+1. Map Filter (Map Menu)
+Add a filter panel inside the Map page. For now it must include three options:
+
+Zones — when selected, all parking zones (Blue and Green) are shown as polygons on the map
+Free Parking — when selected, only free parking spots are shown on the map
+Paid Parking — when selected, only paid parking spots and parking machine markers are shown on the map
+
+Rules:
+
+Multiple filters can be active at the same time
+Filters apply instantly with no map reload or flicker
+Use useMemo or useCallback so only the relevant markers and polygons re-evaluate, not the entire map component
+The filter UI should be a clean floating card or panel — styled consistently with the rest of the app
+Filters must persist while the user navigates around the map
+
+
+2. Full Map vs City View (Map Page)
+When the user selects Full Map, the map shows the entire world map with all parkings, zones, and markers visible globally.
+When the user selects a specific city (e.g. Burgas), the map:
+
+Pans and zooms smoothly to that city using fitBounds or panTo + setZoom
+Shows only that city's zones, parkings, and markers
+The active filter (Zones / Free Parking / Paid Parking) still applies on top of the city selection
+No flicker, no reload, smooth transition
+
+Cities are stored in a config array so new cities can be added easily later.
+
+3. My Vehicles — Add Car + Location Pinning
+On the My Vehicles page:
+
+The user can add a car (make, model, license plate, color — store what already exists in the data model)
+After adding a car, it is immediately visible in the My Vehicles list
+The user can select a car and pin its current location — either by clicking on the map or by using their current GPS location
+The pinned car location is shown on the Map page as a distinct car marker (different icon from parking markers)
+The user can update the car location at any time
+
+Parking History per car:
+
+Every time the user pins a location for a car, that location is saved as a history entry with: location name or coordinates, timestamp (arrival), and optionally departure time
+On the My Vehicles page, each car has a Parking History section or tab showing a list of past locations in reverse chronological order
+The user can view, manage (delete entries), and browse the history
+Parking history entries are stored per user per car
+
+
+4. Notifications Page
+On the Notifications page, users receive in-app notifications for:
+
+🕒 Parking time reminders — alerts when parking time is about to expire (e.g. 15 min and 5 min warnings)
+🏷️ Promotions and discounts — promotional messages pushed from the admin side
+ℹ️ General info — updates about parking zones, new locations, or app announcements
+
+Notification UI requirements:
+
+Each notification shows: icon, title, short message, and timestamp
+Unread notifications are visually distinct (bold, dot indicator, or highlighted)
+The user can mark individual notifications as read or clear all
+A badge on the Notifications nav item shows the count of unread notifications
+Notifications are stored per user in the database (or local state if no backend is connected yet — make it easy to swap later)
+
+
+5. General Requirements
+
+Do not break any existing functionality — map, zones, markers, auth, super admin role
+All new UI must be responsive (desktop and mobile)
+Smooth animations on panel open/close, filter toggles, and map transitions — no lag
+Use React.memo, useCallback, useMemo throughout new components to keep performance clean
+Ask me for existing files (map component, data models, auth/role logic) before touching anything related to them

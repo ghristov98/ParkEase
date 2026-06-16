@@ -56,6 +56,11 @@ export default function VehiclesScreen() {
                   <Text style={[styles.vehicleModel, { color: colors.mutedForeground }]}>
                     {item.brand} {item.model} • {item.year}
                   </Text>
+                  {(item as any).latitude != null && (
+                    <View style={[styles.locationBadge, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" }]}>
+                      <Text style={[styles.locationBadgeText, { color: colors.primary }]}>📍 Location pinned</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.chevronEmoji}>›</Text>
               </View>
@@ -177,6 +182,20 @@ const styles = StyleSheet.create({
   chevronEmoji: {
     fontSize: 24,
     color: "#6B7399",
+  },
+  locationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+    marginTop: 4,
+  },
+  locationBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   fabEmoji: {
     fontSize: 22,

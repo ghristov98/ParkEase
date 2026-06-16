@@ -44,6 +44,14 @@ export default function NotificationsScreen() {
     }
   };
 
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "reminder": return "🕒";
+      case "promotion": return "🏷️";
+      default: return "ℹ️";
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -86,10 +94,13 @@ export default function NotificationsScreen() {
               !item.isRead && {
                 borderLeftWidth: 4,
                 borderLeftColor: colors.primary,
-                backgroundColor: colors.primary + "05",
+                backgroundColor: colors.primary + "08",
               },
             ]}
           >
+            <View style={[styles.iconWrap, { backgroundColor: colors.muted }]}>
+              <Text style={styles.typeIcon}>{getTypeIcon(item.type)}</Text>
+            </View>
             <View style={styles.content}>
               <View style={styles.topRow}>
                 <Text style={[styles.notifTitle, { color: colors.foreground }, !item.isRead && styles.bold]}>
@@ -101,6 +112,7 @@ export default function NotificationsScreen() {
               </View>
               <Text style={[styles.body, { color: colors.mutedForeground }]}>{item.body}</Text>
             </View>
+            {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
           </TouchableOpacity>
         )}
         ListEmptyComponent={
@@ -143,14 +155,33 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   notificationItem: {
-    padding: 16,
-    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 14,
+    borderRadius: 14,
     marginBottom: 12,
+    gap: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+  },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  typeIcon: { fontSize: 20 },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
+    flexShrink: 0,
   },
   content: {
     flex: 1,

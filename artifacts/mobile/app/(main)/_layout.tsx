@@ -15,8 +15,8 @@ function UnreadBadge({ color: _color }: { color: string }) {
   const count = data?.count ?? 0;
   if (!count) return null;
   return (
-    <View style={[styles.badge, { position: "absolute", top: -4, right: -8 }]}>
-      <View style={styles.badgeDot} />
+    <View style={[styles.badge, { position: "absolute", top: -6, right: -10 }]}>
+      <Text style={styles.badgeText}>{count > 99 ? "99+" : String(count)}</Text>
     </View>
   );
 }
@@ -143,11 +143,24 @@ const styles = StyleSheet.create({
   tabEmoji: {
     fontSize: 22,
   },
-  badge: {},
+  badge: {
+    backgroundColor: "#EF4444",
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    minWidth: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   badgeDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: "#EF4444",
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
   },
 });
