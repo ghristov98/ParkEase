@@ -70,6 +70,7 @@ interface FilterState {
   zones: boolean;
   freeParking: boolean;
   paidParking: boolean;
+  parkingMachines: boolean;
   penaltyParking: boolean;
 }
 
@@ -77,6 +78,7 @@ const DEFAULT_FILTERS: FilterState = {
   zones: true,
   freeParking: true,
   paidParking: true,
+  parkingMachines: true,
   penaltyParking: true,
 };
 
@@ -311,8 +313,8 @@ export default function MapScreen() {
         getDistanceMeters(nearbyMachinesCoord.latitude, nearbyMachinesCoord.longitude, m.lat, m.lng) <= 500
       );
     }
-    return filters.paidParking ? PARKING_MACHINES : [];
-  }, [filters.paidParking, nearbyMachinesCoord]);
+    return filters.parkingMachines ? PARKING_MACHINES : [];
+  }, [filters.parkingMachines, nearbyMachinesCoord]);
 
   const filteredParkingLots = useMemo(() => {
     const lots = (parkingLots ?? []) as any[];
@@ -695,6 +697,7 @@ export default function MapScreen() {
             <FilterToggle label="🔵🟢 Zones" active={filters.zones} onPress={() => toggleFilter("zones")} />
             <FilterToggle label="🆓 Free Parking" active={filters.freeParking} onPress={() => toggleFilter("freeParking")} />
             <FilterToggle label="💳 Paid Parking" active={filters.paidParking} onPress={() => toggleFilter("paidParking")} />
+            <FilterToggle label="🅿️ Machines" active={filters.parkingMachines} onPress={() => toggleFilter("parkingMachines")} />
 
             {/* Penalty toggle — superadmin only */}
             {isSuperAdmin && (
