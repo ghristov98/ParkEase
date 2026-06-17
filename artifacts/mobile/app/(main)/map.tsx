@@ -248,7 +248,10 @@ export default function MapScreen() {
     getGetParkingLotsQueryOptions({ search: search || undefined })
   );
 
-  const { data: userVehicles } = useQuery(getGetVehiclesQueryOptions());
+  const { data: userVehicles } = useQuery({
+    ...getGetVehiclesQueryOptions(),
+    retry: 0,
+  });
 
   const vehicleMarkers = useMemo(() =>
     (userVehicles ?? []).filter((v: any) => v.latitude != null && v.longitude != null),
@@ -276,7 +279,7 @@ export default function MapScreen() {
   useEffect(() => {
     Animated.spring(filterAnim, {
       toValue: filterOpen ? 1 : 0,
-      useNativeDriver: true,
+      useNativeDriver: false,
       tension: 80,
       friction: 12,
     }).start();
@@ -371,7 +374,7 @@ export default function MapScreen() {
   useEffect(() => {
     Animated.spring(bannerAnim, {
       toValue: zoneResult.zone ? 1 : 0,
-      useNativeDriver: true,
+      useNativeDriver: false,
       tension: 80,
       friction: 12,
     }).start();
@@ -688,9 +691,9 @@ export default function MapScreen() {
               inputRange: [0, 1],
               outputRange: [0, 1],
             }),
+            pointerEvents: filterOpen ? "auto" : "none",
           },
         ]}
-        pointerEvents={filterOpen ? "auto" : "none"}
       >
         <Card padding={false}>
           <View style={styles.filterPanelInner}>
@@ -737,7 +740,7 @@ export default function MapScreen() {
       <Animated.View
         style={[
           styles.zoneBanner,
-          { top: insets.top + 68 },
+          { top: insets.top + 68, pointerEvents: "none" },
           {
             opacity: bannerAnim,
             transform: [{ translateY: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
@@ -746,7 +749,6 @@ export default function MapScreen() {
             ? styles.zoneBannerBlue
             : styles.zoneBannerGreen,
         ]}
-        pointerEvents="none"
       >
         <Text style={styles.zoneBannerEmoji}>
           {zoneResult.zone === "blue" ? "🔵" : "🟢"}
