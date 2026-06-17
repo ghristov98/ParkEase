@@ -641,13 +641,6 @@ export default function MapScreen() {
       <View style={[styles.floatingSearch, { top: insets.top + 10 }]}>
         <View style={styles.searchRow}>
           <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIconText="🔍" style={[styles.searchInput, { flex: 1 }]} />
-          <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: colors.card }]}
-            onPress={() => setFilterOpen((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.filterBtnEmoji}>☰</Text>
-          </TouchableOpacity>
         </View>
 
         {/* City selector segmented control */}
@@ -675,12 +668,12 @@ export default function MapScreen() {
         </View>
       </View>
 
-      {/* Filter panel — animated slide-in */}
+      {/* Filter panel — animated slide-in above the FAB */}
       <Animated.View
         style={[
           styles.filterPanel,
           {
-            top: insets.top + 122,
+            bottom: insets.bottom + 130,
             transform: [{
               translateX: filterAnim.interpolate({
                 inputRange: [0, 1],
@@ -787,6 +780,21 @@ export default function MapScreen() {
           </Card>
         </View>
       )}
+
+      {/* Filter FAB — above the Profile tab button */}
+      <TouchableOpacity
+        style={[
+          styles.filterFab,
+          {
+            bottom: insets.bottom + 72,
+            backgroundColor: filterOpen ? colors.primary : colors.card,
+          },
+        ]}
+        onPress={() => setFilterOpen((v) => !v)}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.filterFabEmoji, filterOpen && { color: "white" }]}>☰</Text>
+      </TouchableOpacity>
 
       {isSuperAdmin && (
         <TouchableOpacity style={[styles.adminFab, { bottom: 100 + insets.bottom, backgroundColor: colors.primary }]} onPress={() => router.push("/admin")}>
@@ -1102,6 +1110,24 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   filterBtnEmoji: { fontSize: 22 },
+  filterFab: {
+    position: "absolute",
+    right: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E2E7F5",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 5,
+    zIndex: 11,
+  },
+  filterFabEmoji: { fontSize: 20 },
   floatingSearch: { position: "absolute", left: 16, right: 16, zIndex: 10 },
   searchInput: { backgroundColor: "white", height: 50 },
   citySelector: {
