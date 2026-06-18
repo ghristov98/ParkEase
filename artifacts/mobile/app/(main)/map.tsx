@@ -12,6 +12,8 @@ import {
 import { ActiveSessionCard } from "@/components/ActiveSessionCard";
 import { StartSessionModal } from "@/components/StartSessionModal";
 import { ExtendSessionModal } from "@/components/ExtendSessionModal";
+import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
+import { useSessionExpiryNotifications } from "@/hooks/useSessionExpiryNotifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -309,6 +311,8 @@ export default function MapScreen() {
       },
     },
   });
+
+  useSessionExpiryNotifications(activeSessions, accessToken);
 
   const vehicleMarkers = useMemo(() =>
     (userVehicles ?? []).filter((v: any) => v.latitude != null && v.longitude != null),
@@ -852,6 +856,13 @@ export default function MapScreen() {
               </View>
             </View>
           </Card>
+        </View>
+      )}
+
+      {/* Notification permission prompt — shown above session card when permission not yet granted */}
+      {(activeSessions?.length ?? 0) > 0 && (
+        <View style={[styles.sessionCardWrapper, { bottom: insets.bottom + 58 + 128 + 8 + 8 }]}>
+          <NotificationPermissionBanner visible={true} />
         </View>
       )}
 

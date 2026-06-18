@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CreateSelfNotificationRequest,
   ExtendSessionRequest,
   GetSessionsParams,
   ParkingSession,
@@ -3510,6 +3511,45 @@ export const useEndSession = <TError = ErrorType<unknown>, TContext = unknown>(
   options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof endSession>>, TError, { id: string }, TContext>; request?: SecondParameter<typeof customFetch> }
 ): UseMutationResult<Awaited<ReturnType<typeof endSession>>, TError, { id: string }, TContext> => {
   return useMutation(getEndSessionMutationOptions(options));
+};
+
+// ─── SELF NOTIFICATION ───────────────────────────────────────────────────────
+
+export const getCreateSelfNotificationUrl = () => `/api/notifications/self`;
+
+export const createSelfNotification = async (createSelfNotificationRequest: CreateSelfNotificationRequest, options?: RequestInit): Promise<import('./api.schemas').Notification> => {
+  return customFetch<import('./api.schemas').Notification>(getCreateSelfNotificationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createSelfNotificationRequest),
+  });
+};
+
+export const getCreateSelfNotificationMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof createSelfNotification>>, TError, { data: BodyType<CreateSelfNotificationRequest> }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof createSelfNotification>>, TError, { data: BodyType<CreateSelfNotificationRequest> }, TContext> => {
+  const mutationKey = ['createSelfNotification'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSelfNotification>>, { data: BodyType<CreateSelfNotificationRequest> }> = (props) => {
+    const { data } = props ?? {};
+    return createSelfNotification(data, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateSelfNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof createSelfNotification>>>;
+export type CreateSelfNotificationMutationBody = BodyType<CreateSelfNotificationRequest>;
+export type CreateSelfNotificationMutationError = ErrorType<unknown>;
+
+export const useCreateSelfNotification = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof createSelfNotification>>, TError, { data: BodyType<CreateSelfNotificationRequest> }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationResult<Awaited<ReturnType<typeof createSelfNotification>>, TError, { data: BodyType<CreateSelfNotificationRequest> }, TContext> => {
+  return useMutation(getCreateSelfNotificationMutationOptions(options));
 };
 
 

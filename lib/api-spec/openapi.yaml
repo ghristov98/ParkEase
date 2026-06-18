@@ -851,6 +851,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
+  /notifications/self:
+    post:
+      operationId: createSelfNotification
+      tags: [notifications]
+      summary: Create a notification for the current user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSelfNotificationRequest"
+      responses:
+        "201":
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
   /notifications/unread-count:
     get:
       operationId: getUnreadNotificationCount
@@ -1568,6 +1589,21 @@ components:
         count:
           type: integer
       required: [count]
+
+    CreateSelfNotificationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        type:
+          type: string
+        linkType:
+          type: string
+        linkId:
+          type: string
+      required: [title, body]
 
     # SESSION SCHEMAS
     ParkingSession:

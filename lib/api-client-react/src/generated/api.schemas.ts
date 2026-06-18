@@ -350,6 +350,14 @@ page?: number;
 limit?: number;
 };
 
+export type CreateSelfNotificationRequest = {
+  title: string;
+  body: string;
+  type?: string;
+  linkType?: string;
+  linkId?: string;
+};
+
 // SESSION SCHEMAS
 export type ParkingSessionExtension = {
   addedMinutes: number;
