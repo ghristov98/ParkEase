@@ -350,6 +350,28 @@ page?: number;
 limit?: number;
 };
 
+export type FavouriteRecord = {
+  id: string;
+  userId: string;
+  parkingLotId: string;
+  createdAt: string;
+};
+
+export type FavouriteLot = {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  type: string;
+  favouriteId: string;
+  favouritedAt: string;
+};
+
+export type FavouriteCheckResponse = {
+  isFavourite: boolean;
+};
+
 export type CreateSelfNotificationRequest = {
   title: string;
   body: string;

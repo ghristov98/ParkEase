@@ -3558,3 +3558,87 @@ export const useCreateSelfNotification = <TError = ErrorType<unknown>, TContext 
 
 
 
+
+// ─── FAVOURITES ───────────────────────────────────────────────────────────────
+
+export const getFavouritesUrl = () => `/api/favourites`;
+
+export const getFavourites = async (options?: RequestInit): Promise<import('./api.schemas').FavouriteLot[]> => {
+  return customFetch<import('./api.schemas').FavouriteLot[]>(getFavouritesUrl(), { ...options });
+};
+
+export const getGetFavouritesQueryOptions = (options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavourites>>, ErrorType<unknown>>> }) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  return { queryKey: ['getFavourites', ...(queryOptions?.queryKey ?? [])], queryFn: () => getFavourites(requestOptions), ...queryOptions };
+};
+
+export const useGetFavourites = (options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavourites>>, ErrorType<unknown>>> }) => {
+  return useQuery(getGetFavouritesQueryOptions(options));
+};
+
+export const getCheckFavouriteUrl = (lotId: string) => `/api/favourites/${lotId}/check`;
+
+export const checkFavourite = async (lotId: string, options?: RequestInit): Promise<import('./api.schemas').FavouriteCheckResponse> => {
+  return customFetch<import('./api.schemas').FavouriteCheckResponse>(getCheckFavouriteUrl(lotId), { ...options });
+};
+
+export const getCheckFavouriteQueryOptions = (lotId: string, options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof checkFavourite>>, ErrorType<unknown>>> }) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  return { queryKey: ['checkFavourite', lotId, ...(queryOptions?.queryKey ?? [])], queryFn: () => checkFavourite(lotId, requestOptions), ...queryOptions };
+};
+
+export const getAddFavouriteUrl = (lotId: string) => `/api/favourites/${lotId}`;
+
+export const addFavourite = async (lotId: string, options?: RequestInit): Promise<import('./api.schemas').FavouriteRecord> => {
+  return customFetch<import('./api.schemas').FavouriteRecord>(getAddFavouriteUrl(lotId), { ...options, method: 'POST' });
+};
+
+export const getAddFavouriteMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof addFavourite>>, TError, { lotId: string }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof addFavourite>>, TError, { lotId: string }, TContext> => {
+  const mutationKey = ['addFavourite'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof addFavourite>>, { lotId: string }> = (props) => {
+    const { lotId } = props ?? {};
+    return addFavourite(lotId, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useAddFavourite = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof addFavourite>>, TError, { lotId: string }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationResult<Awaited<ReturnType<typeof addFavourite>>, TError, { lotId: string }, TContext> => {
+  return useMutation(getAddFavouriteMutationOptions(options));
+};
+
+export const getRemoveFavouriteUrl = (lotId: string) => `/api/favourites/${lotId}`;
+
+export const removeFavourite = async (lotId: string, options?: RequestInit): Promise<import('./api.schemas').MessageResponse> => {
+  return customFetch<import('./api.schemas').MessageResponse>(getRemoveFavouriteUrl(lotId), { ...options, method: 'DELETE' });
+};
+
+export const getRemoveFavouriteMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof removeFavourite>>, TError, { lotId: string }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof removeFavourite>>, TError, { lotId: string }, TContext> => {
+  const mutationKey = ['removeFavourite'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeFavourite>>, { lotId: string }> = (props) => {
+    const { lotId } = props ?? {};
+    return removeFavourite(lotId, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useRemoveFavourite = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof removeFavourite>>, TError, { lotId: string }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationResult<Awaited<ReturnType<typeof removeFavourite>>, TError, { lotId: string }, TContext> => {
+  return useMutation(getRemoveFavouriteMutationOptions(options));
+};

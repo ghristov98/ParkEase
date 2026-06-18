@@ -2,11 +2,14 @@ import {
   getGetParkingLotsQueryOptions,
   getGetVehiclesQueryOptions,
   getGetActiveSessionsQueryOptions,
+  getGetFavouritesQueryOptions,
   useCreateParkingLot,
   useDeleteParkingLot,
   useStartSession,
   useEndSession,
   useExtendSession,
+  useAddFavourite,
+  useRemoveFavourite,
   type StartSessionRequest,
 } from "@workspace/api-client-react";
 import { ActiveSessionCard } from "@/components/ActiveSessionCard";
@@ -82,6 +85,7 @@ interface FilterState {
   paidParking: boolean;
   parkingMachines: boolean;
   penaltyParking: boolean;
+  favourites: boolean;
 }
 
 const DEFAULT_FILTERS: FilterState = {
@@ -90,6 +94,7 @@ const DEFAULT_FILTERS: FilterState = {
   paidParking: true,
   parkingMachines: true,
   penaltyParking: true,
+  favourites: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -287,6 +292,30 @@ export default function MapScreen() {
     enabled: !!accessToken,
   });
 
+  const { data: favouriteLots, refetch: refetchFavourites } = useQuery({
+    ...getGetFavouritesQueryOptions(),
+    retry: 0,
+    enabled: !!accessToken,
+  });
+
+  const favouriteIds = useMemo(() => new Set((favouriteLots ?? []).map((f: any) => f.id)), [favouriteLots]);
+
+  const addFavouriteMutation = useAddFavourite({
+    mutation: { onSuccess: () => refetchFavourites() },
+  });
+  const removeFavouriteMutation = useRemoveFavourite({
+    mutation: { onSuccess: () => refetchFavourites() },
+  });
+
+  const toggleFavourite = (lotId: string) => {
+    if (!accessToken) return;
+    if (favouriteIds.has(lotId)) {
+      removeFavouriteMutation.mutate({ lotId });
+    } else {
+      addFavouriteMutation.mutate({ lotId });
+    }
+  };
+
   const startSessionMutation = useStartSession({
     mutation: {
       onSuccess: () => {
@@ -390,10 +419,13 @@ export default function MapScreen() {
           if (!city || lot.latitude == null || lot.longitude == null) return true;
           return getDistanceMeters(lot.latitude, lot.longitude, city.center.latitude, city.center.longitude) <= 50000;
         });
-    return cityFiltered.filter((lot: any) =>
-      lot.type === "free" ? filters.freeParking : lot.type === "paid" ? filters.paidParking : true
-    );
-  }, [parkingLots, filters.freeParking, filters.paidParking, selectedCity]);
+    return cityFiltered.filter((lot: any) => {
+      if (!filters.freeParking && lot.type === "free") return false;
+      if (!filters.paidParking && lot.type === "paid") return false;
+      if (filters.favourites && !favouriteIds.has(lot.id)) return false;
+      return true;
+    });
+  }, [parkingLots, filters.freeParking, filters.paidParking, filters.favourites, favouriteIds, selectedCity]);
 
   const filteredPenaltyMarkers = useMemo(() =>
     isSuperAdmin && filters.penaltyParking ? penaltyMarkers : [],
@@ -763,6 +795,9 @@ export default function MapScreen() {
             <FilterToggle label="🆓 Free Parking" active={filters.freeParking} onPress={() => toggleFilter("freeParking")} />
             <FilterToggle label="💳 Paid Parking" active={filters.paidParking} onPress={() => toggleFilter("paidParking")} />
             <FilterToggle label="🅿️ Machines" active={filters.parkingMachines} onPress={() => toggleFilter("parkingMachines")} />
+            {accessToken && (
+              <FilterToggle label="⭐ Favourites" active={filters.favourites} onPress={() => toggleFilter("favourites")} />
+            )}
 
             {/* Penalty toggle — superadmin only */}
             {isSuperAdmin && (
@@ -851,6 +886,14 @@ export default function MapScreen() {
                     onPress={() => { setShowStartSession(true); }}
                   >
                     <Text style={[styles.parkHereText, { color: colors.primary }]}>🅿️ Park</Text>
+                  </TouchableOpacity>
+                )}
+                {accessToken && (
+                  <TouchableOpacity
+                    style={[styles.parkHereButton, { borderColor: favouriteIds.has(selectedLot.id) ? "#F59E0B" : colors.border }]}
+                    onPress={() => toggleFavourite(selectedLot.id)}
+                  >
+                    <Text style={{ fontSize: 18 }}>{favouriteIds.has(selectedLot.id) ? "⭐" : "☆"}</Text>
                   </TouchableOpacity>
                 )}
               </View>

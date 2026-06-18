@@ -1,8 +1,9 @@
 
-import { useUpdateProfile } from "@workspace/api-client-react";
+import { useUpdateProfile, getGetFavouritesQueryOptions, useRemoveFavourite } from "@workspace/api-client-react";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
   Image,
@@ -25,6 +26,16 @@ export default function ProfileScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+
+  const { data: favourites, refetch: refetchFavourites } = useQuery({
+    ...getGetFavouritesQueryOptions(),
+    enabled: !!accessToken,
+    retry: 0,
+  });
+
+  const removeFavourite = useRemoveFavourite({
+    mutation: { onSuccess: () => refetchFavourites() },
+  });
   
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
@@ -174,6 +185,46 @@ export default function ProfileScreen() {
             </View>
           )}
         </Card>
+
+        {/* Favourites Section */}
+        {accessToken && (
+          <Card style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>⭐ Favourites</Text>
+            </View>
+            {(favourites ?? []).length === 0 ? (
+              <Text style={[styles.infoText, { color: colors.mutedForeground }]}>No favourite spots yet. Tap ☆ on any parking lot to save it.</Text>
+            ) : (
+              (favourites ?? []).map((fav: any) => (
+                <View key={fav.id} style={[styles.favItem, { borderBottomColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.favName, { color: colors.foreground }]}>{fav.name}</Text>
+                    <Text style={[styles.favAddress, { color: colors.mutedForeground }]}>{fav.address}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                      <Text style={[styles.favType, { color: fav.type === "free" ? "#16A34A" : colors.primary }]}>
+                        {fav.type === "free" ? "🆓 Free" : "💳 Paid"}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.favActions}>
+                    <TouchableOpacity
+                      style={[styles.favNavBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => router.push(`/parking/${fav.id}`)}
+                    >
+                      <Text style={styles.favNavText}>Details</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.favRemoveBtn, { borderColor: "#EF4444" }]}
+                      onPress={() => removeFavourite.mutate({ lotId: fav.id })}
+                    >
+                      <Text style={{ color: "#EF4444", fontSize: 16 }}>★</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
+          </Card>
+        )}
 
         {user?.role === "superadmin" && (
           <TouchableOpacity onPress={() => router.push("/admin")} style={styles.adminCard}>
@@ -329,5 +380,47 @@ const styles = StyleSheet.create({
   signOutButton: {
     marginTop: 8,
     borderColor: "#EF4444",
+  },
+  favItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  favName: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  favAddress: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  favType: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  favActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  favNavBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  favNavText: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  favRemoveBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

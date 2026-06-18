@@ -7,3 +7,4 @@ export * from "./vehicleHistory";
 export * from "./notifications";
 export * from "./refreshTokens";
 export * from "./parkingSessions";
+export * from "./favourites";

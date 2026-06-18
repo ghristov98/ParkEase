@@ -8,6 +8,7 @@ import vehiclesRouter from "./vehicles";
 import notificationsRouter from "./notifications";
 import aiRouter from "./ai";
 import sessionsRouter from "./sessions";
+import favouritesRouter from "./favourites";
 
 const router: IRouter = Router();
 
@@ -19,6 +20,7 @@ router.use(extrasRouter);
 router.use(vehiclesRouter);
 router.use(notificationsRouter);
 router.use(sessionsRouter);
+router.use(favouritesRouter);
 router.use(aiRouter);
 
 export default router;
