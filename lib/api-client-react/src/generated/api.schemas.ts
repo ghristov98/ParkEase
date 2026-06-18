@@ -350,3 +350,51 @@ page?: number;
 limit?: number;
 };
 
+// SESSION SCHEMAS
+export type ParkingSessionExtension = {
+  addedMinutes: number;
+  timestamp: string;
+};
+
+export type ParkingSession = {
+  id: string;
+  userId: string;
+  vehicleId: string;
+  parkingLotId?: string | null;
+  locationName: string;
+  locationAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  startTime: string;
+  endTime?: string | null;
+  paidMinutes?: number | null;
+  status: 'active' | 'ended' | 'expired';
+  extensions: ParkingSessionExtension[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StartSessionRequest = {
+  vehicleId: string;
+  parkingLotId?: string;
+  locationName: string;
+  locationAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  paidMinutes?: number;
+};
+
+export type ExtendSessionRequest = {
+  addMinutes: number;
+};
+
+export type SessionListResponse = {
+  sessions: ParkingSession[];
+  page: number;
+};
+
+export type GetSessionsParams = {
+  page?: number;
+  limit?: number;
+};
+

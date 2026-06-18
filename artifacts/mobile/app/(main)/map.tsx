@@ -1,9 +1,17 @@
 import {
   getGetParkingLotsQueryOptions,
   getGetVehiclesQueryOptions,
+  getGetActiveSessionsQueryOptions,
   useCreateParkingLot,
   useDeleteParkingLot,
+  useStartSession,
+  useEndSession,
+  useExtendSession,
+  type StartSessionRequest,
 } from "@workspace/api-client-react";
+import { ActiveSessionCard } from "@/components/ActiveSessionCard";
+import { StartSessionModal } from "@/components/StartSessionModal";
+import { ExtendSessionModal } from "@/components/ExtendSessionModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -247,6 +255,11 @@ export default function MapScreen() {
   const [selectedPenalty, setSelectedPenalty] = useState<PenaltyMarker | null>(null);
   const [penaltyNote, setPenaltyNote] = useState("");
 
+  // Session state
+  const [showStartSession, setShowStartSession] = useState(false);
+  const [showExtendSession, setShowExtendSession] = useState(false);
+  const [extendingSessionId, setExtendingSessionId] = useState<string | null>(null);
+
   const { user, accessToken } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -263,6 +276,38 @@ export default function MapScreen() {
   const { data: userVehicles } = useQuery({
     ...getGetVehiclesQueryOptions(),
     retry: 0,
+  });
+
+  const { data: activeSessions, refetch: refetchSessions } = useQuery({
+    ...getGetActiveSessionsQueryOptions(),
+    retry: 0,
+    refetchInterval: 30_000,
+    enabled: !!accessToken,
+  });
+
+  const startSessionMutation = useStartSession({
+    mutation: {
+      onSuccess: () => {
+        refetchSessions();
+        setShowStartSession(false);
+      },
+    },
+  });
+
+  const endSessionMutation = useEndSession({
+    mutation: {
+      onSuccess: () => refetchSessions(),
+    },
+  });
+
+  const extendSessionMutation = useExtendSession({
+    mutation: {
+      onSuccess: () => {
+        refetchSessions();
+        setShowExtendSession(false);
+        setExtendingSessionId(null);
+      },
+    },
   });
 
   const vehicleMarkers = useMemo(() =>
@@ -791,21 +836,55 @@ export default function MapScreen() {
                 <Badge label={selectedLot.type} variant={selectedLot.type === "free" ? "free" : "paid"} />
               </View>
               <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>{selectedLot.address}</Text>
-              <TouchableOpacity style={[styles.detailsButton, { backgroundColor: colors.primary }]} onPress={() => router.push(`/parking/${selectedLot.id}`)}>
-                <Text style={styles.detailsButtonText}>View Details</Text>
-                <Text style={styles.arrowEmoji}>→</Text>
-              </TouchableOpacity>
+              <View style={styles.lotActions}>
+                <TouchableOpacity style={[styles.detailsButton, { backgroundColor: colors.primary, flex: 1 }]} onPress={() => router.push(`/parking/${selectedLot.id}`)}>
+                  <Text style={styles.detailsButtonText}>View Details</Text>
+                  <Text style={styles.arrowEmoji}>→</Text>
+                </TouchableOpacity>
+                {accessToken && (
+                  <TouchableOpacity
+                    style={[styles.parkHereButton, { borderColor: colors.primary }]}
+                    onPress={() => { setShowStartSession(true); }}
+                  >
+                    <Text style={[styles.parkHereText, { color: colors.primary }]}>🅿️ Park</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </Card>
         </View>
       )}
 
-      {/* Filter FAB — above the Profile tab button */}
+      {/* Active session cards — just above the tab bar */}
+      {(activeSessions ?? []).map((session) => {
+        const vehicle = (userVehicles ?? []).find((v: any) => v.id === session.vehicleId);
+        return (
+          <View
+            key={session.id}
+            style={[styles.sessionCardWrapper, { bottom: insets.bottom + 58 }]}
+          >
+            <ActiveSessionCard
+              session={session}
+              vehicleName={vehicle?.name}
+              onEnd={() => endSessionMutation.mutate({ id: session.id })}
+              onExtend={() => {
+                setExtendingSessionId(session.id);
+                setShowExtendSession(true);
+              }}
+              isEnding={endSessionMutation.isPending}
+            />
+          </View>
+        );
+      })}
+
+      {/* Filter FAB — moves up when a session card is visible */}
       <TouchableOpacity
         style={[
           styles.filterFab,
           {
-            bottom: insets.bottom + 72,
+            bottom: (activeSessions?.length ?? 0) > 0
+              ? insets.bottom + 58 + 128 + 8
+              : insets.bottom + 72,
             backgroundColor: filterOpen ? colors.primary : colors.card,
           },
         ]}
@@ -1031,6 +1110,34 @@ export default function MapScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Start Session Modal */}
+      <StartSessionModal
+        visible={showStartSession}
+        lot={selectedLot ? {
+          id: selectedLot.id,
+          name: selectedLot.name,
+          address: selectedLot.address,
+          latitude: selectedLot.latitude,
+          longitude: selectedLot.longitude,
+        } : null}
+        vehicles={(userVehicles ?? []) as { id: string; name: string; licensePlate: string }[]}
+        onStart={(req: StartSessionRequest) => startSessionMutation.mutate({ data: req })}
+        onClose={() => setShowStartSession(false)}
+        isLoading={startSessionMutation.isPending}
+      />
+
+      {/* Extend Session Modal */}
+      <ExtendSessionModal
+        visible={showExtendSession}
+        onExtend={(minutes) => {
+          if (extendingSessionId) {
+            extendSessionMutation.mutate({ id: extendingSessionId, data: { addMinutes: minutes } });
+          }
+        }}
+        onClose={() => { setShowExtendSession(false); setExtendingSessionId(null); }}
+        isLoading={extendSessionMutation.isPending}
+      />
     </View>
   );
 }
@@ -1288,6 +1395,10 @@ const styles = StyleSheet.create({
   lotName: { fontSize: 18, fontWeight: "700", flex: 1, marginRight: 8 },
   lotAddress: { fontSize: 14, marginBottom: 16 },
   detailsButton: { flexDirection: "row", height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", gap: 8 },
+  lotActions: { flexDirection: "row", gap: 8, alignItems: "center" },
+  parkHereButton: { height: 44, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  parkHereText: { fontSize: 13, fontWeight: "700" },
+  sessionCardWrapper: { position: "absolute", left: 12, right: 12, zIndex: 15 },
   detailsButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
   closeEmoji: { fontSize: 18, fontWeight: "600" },
   arrowEmoji: { fontSize: 16, color: "white", fontWeight: "600" },
