@@ -350,6 +350,26 @@ page?: number;
 limit?: number;
 };
 
+export type SpendingMonth = { month: string; amount: number };
+export type MostVisitedSpot = { lotId: string; name: string; address: string; type: string; visits: number };
+export type Co2Stats = { kmWalked: number; co2SavedGrams: number; sessionsThisMonth: number };
+export type LoyaltyRedemption = { id: string; pointsSpent: number; minutesGranted: number; createdAt: string };
+export type LoyaltyData = {
+  points: number;
+  tier: string;
+  nextTier: string | null;
+  nextTierAt: number | null;
+  progressPct: number;
+  redemptions: LoyaltyRedemption[];
+};
+export type DashboardData = {
+  spending: SpendingMonth[];
+  mostVisited: MostVisitedSpot[];
+  co2: Co2Stats;
+  loyalty: LoyaltyData;
+};
+export type RedemptionResult = { message: string; newBalance: number; redemption: LoyaltyRedemption };
+
 export type FavouriteRecord = {
   id: string;
   userId: string;

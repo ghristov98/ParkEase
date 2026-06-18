@@ -3642,3 +3642,47 @@ export const useRemoveFavourite = <TError = ErrorType<unknown>, TContext = unkno
 ): UseMutationResult<Awaited<ReturnType<typeof removeFavourite>>, TError, { lotId: string }, TContext> => {
   return useMutation(getRemoveFavouriteMutationOptions(options));
 };
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+
+export const getDashboardUrl = () => `/api/dashboard`;
+
+export const getDashboard = async (options?: RequestInit): Promise<import('./api.schemas').DashboardData> => {
+  return customFetch<import('./api.schemas').DashboardData>(getDashboardUrl(), { ...options });
+};
+
+export const getGetDashboardQueryOptions = (options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, ErrorType<unknown>>> }) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  return { queryKey: ['getDashboard', ...(queryOptions?.queryKey ?? [])], queryFn: () => getDashboard(requestOptions), ...queryOptions };
+};
+
+export const useGetDashboard = (options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, ErrorType<unknown>>> }) => {
+  return useQuery(getGetDashboardQueryOptions(options));
+};
+
+export const getRedeemLoyaltyPointsUrl = () => `/api/loyalty/redeem`;
+
+export const redeemLoyaltyPoints = async (options?: RequestInit): Promise<import('./api.schemas').RedemptionResult> => {
+  return customFetch<import('./api.schemas').RedemptionResult>(getRedeemLoyaltyPointsUrl(), { ...options, method: 'POST' });
+};
+
+export const getRedeemLoyaltyPointsMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof redeemLoyaltyPoints>>, TError, void, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof redeemLoyaltyPoints>>, TError, void, TContext> => {
+  const mutationKey = ['redeemLoyaltyPoints'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof redeemLoyaltyPoints>>, void> = () => {
+    return redeemLoyaltyPoints(requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useRedeemLoyaltyPoints = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof redeemLoyaltyPoints>>, TError, void, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationResult<Awaited<ReturnType<typeof redeemLoyaltyPoints>>, TError, void, TContext> => {
+  return useMutation(getRedeemLoyaltyPointsMutationOptions(options));
+};

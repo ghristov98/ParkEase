@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { parkingSessionsTable, notificationsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { parkingSessionsTable, notificationsTable, usersTable } from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
 const router = Router();
@@ -126,11 +126,23 @@ router.put("/sessions/:id/end", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
+  const actualEnd = new Date();
   const [ended] = await db
     .update(parkingSessionsTable)
-    .set({ status: "ended", endTime: new Date() })
+    .set({ status: "ended", endTime: actualEnd })
     .where(eq(parkingSessionsTable.id, id))
     .returning();
+
+  // Award loyalty points: 1 pt per 10 minutes parked
+  const startMs = existing.startTime ? new Date(existing.startTime).getTime() : Date.now();
+  const durationMinutes = Math.floor((actualEnd.getTime() - startMs) / 60000);
+  const pointsEarned = Math.floor(durationMinutes / 10);
+  if (pointsEarned > 0) {
+    await db
+      .update(usersTable)
+      .set({ loyaltyPoints: sql`${usersTable.loyaltyPoints} + ${pointsEarned}` })
+      .where(eq(usersTable.id, req.user!.userId));
+  }
 
   res.json(ended);
 });

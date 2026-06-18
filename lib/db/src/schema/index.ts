@@ -8,3 +8,4 @@ export * from "./notifications";
 export * from "./refreshTokens";
 export * from "./parkingSessions";
 export * from "./favourites";
+export * from "./loyaltyRedemptions";

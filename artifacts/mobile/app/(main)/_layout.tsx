@@ -28,6 +28,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "map", selected: "map.fill" }} />
         <Label>Map</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="dashboard">
+        <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
+        <Label>Dashboard</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="vehicles">
         <Icon sf={{ default: "car", selected: "car.fill" }} />
         <Label>Vehicles</Label>
@@ -89,6 +93,18 @@ function ClassicTabLayout() {
               <SymbolView name={focused ? "map.fill" : "map"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
             ) : (
               <Text style={styles.tabEmoji}>🗺️</Text>
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ focused }) =>
+            isIOS ? (
+              <SymbolView name={focused ? "chart.bar.fill" : "chart.bar"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
+            ) : (
+              <Text style={styles.tabEmoji}>📊</Text>
             ),
         }}
       />
