@@ -96,6 +96,16 @@ interface PenaltyMarker {
 
 const PENALTY_STORAGE_KEY = "parkease_penalty_markers";
 
+const DEFAULT_PENALTY_MARKERS: PenaltyMarker[] = [
+  {
+    id: "default-oborishte-90",
+    latitude: 42.5051,
+    longitude: 27.4697,
+    timestamp: 0,
+    note: 'ул. "Оборище" №90',
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Memoized marker components
 // ---------------------------------------------------------------------------
@@ -260,12 +270,18 @@ export default function MapScreen() {
     [userVehicles]
   );
 
-  // Load penalty markers from storage
+  // Load penalty markers from storage, always merging with defaults
   useEffect(() => {
     (async () => {
       try {
         const stored = await AsyncStorage.getItem(PENALTY_STORAGE_KEY);
-        if (stored) setPenaltyMarkers(JSON.parse(stored));
+        const storedMarkers: PenaltyMarker[] = stored ? JSON.parse(stored) : [];
+        const storedIds = new Set(storedMarkers.map((m) => m.id));
+        const merged = [
+          ...DEFAULT_PENALTY_MARKERS.filter((m) => !storedIds.has(m.id)),
+          ...storedMarkers,
+        ];
+        setPenaltyMarkers(merged);
       } catch { /* ignore */ }
     })();
   }, []);
