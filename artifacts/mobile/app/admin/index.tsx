@@ -86,6 +86,22 @@ export default function AdminDashboard() {
       subtitle: "Broadcast a message to all users",
       route: "/admin/notifications",
     },
+    {
+      emoji: "📣",
+      color: "#0E4BF1",
+      bg: "#EEF1FD",
+      title: "Announcements",
+      subtitle: "Pin city-wide messages in all users' alerts",
+      route: "/admin/broadcasts",
+    },
+    {
+      emoji: "⚠️",
+      color: "#F59E0B",
+      bg: "#FFFBEB",
+      title: "Event Warnings",
+      subtitle: "Alert users about road works, fairs, zone closures",
+      route: "/admin/events",
+    },
   ];
 
   return (

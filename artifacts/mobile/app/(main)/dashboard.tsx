@@ -134,7 +134,7 @@ export default function DashboardScreen() {
           <View style={styles.currentMonthRow}>
             <Text style={[styles.currentMonthLabel, { color: colors.mutedForeground }]}>This month</Text>
             <Text style={[styles.currentMonthValue, { color: colors.primary }]}>
-              {currentMonthTotal.toFixed(2)} BGN
+              {currentMonthTotal.toFixed(2)} EUR
             </Text>
           </View>
           {data?.spending && data.spending.length > 0 ? (

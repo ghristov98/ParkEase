@@ -3686,3 +3686,149 @@ export const useRedeemLoyaltyPoints = <TError = ErrorType<unknown>, TContext = u
 ): UseMutationResult<Awaited<ReturnType<typeof redeemLoyaltyPoints>>, TError, void, TContext> => {
   return useMutation(getRedeemLoyaltyPointsMutationOptions(options));
 };
+
+// ─── Broadcasts ──────────────────────────────────────────────────────────────
+
+export const getBroadcastsUrl = () => `/api/broadcasts`;
+
+export const getBroadcasts = async (options?: RequestInit): Promise<import('./api.schemas').Broadcast[]> => {
+  return customFetch<import('./api.schemas').Broadcast[]>(getBroadcastsUrl(), { ...options, method: 'GET' });
+};
+
+export const getGetBroadcastsQueryOptions = (options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getBroadcasts>>, ErrorType<unknown>>> }) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = ['getBroadcasts'];
+  return { queryKey, queryFn: () => getBroadcasts(requestOptions), ...queryOptions };
+};
+
+export const useGetBroadcasts = (options?: Parameters<typeof getGetBroadcastsQueryOptions>[0]) => {
+  return useQuery(getGetBroadcastsQueryOptions(options));
+};
+
+export const createBroadcast = async (data: { title: string; body: string }, options?: RequestInit): Promise<import('./api.schemas').Broadcast> => {
+  return customFetch<import('./api.schemas').Broadcast>(getBroadcastsUrl(), { ...options, method: 'POST', headers: { 'Content-Type': 'application/json', ...options?.headers }, body: JSON.stringify(data) });
+};
+
+export const getCreateBroadcastMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof createBroadcast>>, TError, { title: string; body: string }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof createBroadcast>>, TError, { title: string; body: string }, TContext> => {
+  const mutationKey = ['createBroadcast'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBroadcast>>, { title: string; body: string }> = (data) => {
+    return createBroadcast(data, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useCreateBroadcast = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: Parameters<typeof getCreateBroadcastMutationOptions>[0]
+) => useMutation(getCreateBroadcastMutationOptions(options));
+
+export const deleteBroadcastUrl = (id: string) => `/api/broadcasts/${id}`;
+
+export const deleteBroadcast = async (id: string, options?: RequestInit): Promise<{ message: string }> => {
+  return customFetch<{ message: string }>(deleteBroadcastUrl(id), { ...options, method: 'DELETE' });
+};
+
+export const getDeleteBroadcastMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteBroadcast>>, TError, { id: string }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBroadcast>>, TError, { id: string }, TContext> => {
+  const mutationKey = ['deleteBroadcast'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBroadcast>>, { id: string }> = ({ id }) => {
+    return deleteBroadcast(id, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useDeleteBroadcast = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: Parameters<typeof getDeleteBroadcastMutationOptions>[0]
+) => useMutation(getDeleteBroadcastMutationOptions(options));
+
+// ─── Parking Events ───────────────────────────────────────────────────────────
+
+export const getActiveEventsUrl = () => `/api/events/active`;
+
+export const getActiveEvents = async (options?: RequestInit): Promise<import('./api.schemas').ParkingEvent[]> => {
+  return customFetch<import('./api.schemas').ParkingEvent[]>(getActiveEventsUrl(), { ...options, method: 'GET' });
+};
+
+export const getGetActiveEventsQueryOptions = (options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getActiveEvents>>, ErrorType<unknown>>> }) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = ['getActiveEvents'];
+  return { queryKey, queryFn: () => getActiveEvents(requestOptions), ...queryOptions };
+};
+
+export const useGetActiveEvents = (options?: Parameters<typeof getGetActiveEventsQueryOptions>[0]) => {
+  return useQuery(getGetActiveEventsQueryOptions(options));
+};
+
+export const getAllEventsUrl = () => `/api/events`;
+
+export const getAllEvents = async (options?: RequestInit): Promise<import('./api.schemas').ParkingEvent[]> => {
+  return customFetch<import('./api.schemas').ParkingEvent[]>(getAllEventsUrl(), { ...options, method: 'GET' });
+};
+
+export const getGetAllEventsQueryOptions = (options?: { request?: SecondParameter<typeof customFetch>; query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAllEvents>>, ErrorType<unknown>>> }) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = ['getAllEvents'];
+  return { queryKey, queryFn: () => getAllEvents(requestOptions), ...queryOptions };
+};
+
+export const createEventUrl = () => `/api/events`;
+
+export const createEvent = async (data: { title: string; message: string; zone?: string; startTime: string; endTime: string }, options?: RequestInit): Promise<import('./api.schemas').ParkingEvent> => {
+  return customFetch<import('./api.schemas').ParkingEvent>(createEventUrl(), { ...options, method: 'POST', headers: { 'Content-Type': 'application/json', ...options?.headers }, body: JSON.stringify(data) });
+};
+
+export const getCreateEventMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof createEvent>>, TError, Parameters<typeof createEvent>[0], TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof createEvent>>, TError, Parameters<typeof createEvent>[0], TContext> => {
+  const mutationKey = ['createEvent'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEvent>>, Parameters<typeof createEvent>[0]> = (data) => {
+    return createEvent(data, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useCreateEvent = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: Parameters<typeof getCreateEventMutationOptions>[0]
+) => useMutation(getCreateEventMutationOptions(options));
+
+export const deleteEventUrl = (id: string) => `/api/events/${id}`;
+
+export const deleteEvent = async (id: string, options?: RequestInit): Promise<{ message: string }> => {
+  return customFetch<{ message: string }>(deleteEventUrl(id), { ...options, method: 'DELETE' });
+};
+
+export const getDeleteEventMutationOptions = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteEvent>>, TError, { id: string }, TContext>; request?: SecondParameter<typeof customFetch> }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEvent>>, TError, { id: string }, TContext> => {
+  const mutationKey = ['deleteEvent'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEvent>>, { id: string }> = ({ id }) => {
+    return deleteEvent(id, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useDeleteEvent = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: Parameters<typeof getDeleteEventMutationOptions>[0]
+) => useMutation(getDeleteEventMutationOptions(options));

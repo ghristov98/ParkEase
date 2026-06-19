@@ -46,6 +46,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useNavigate } from "@/hooks/useNavigate";
 
 const PARKING_PIN = require("@/assets/images/image.png");
 
@@ -275,6 +276,7 @@ export default function MapScreen() {
   const createMutation = useCreateParkingLot();
   const deleteMutation = useDeleteParkingLot();
   const isSuperAdmin = user?.role === "superadmin";
+  const { navigate: navToLot } = useNavigate();
 
   const { data: parkingLots } = useQuery(
     getGetParkingLotsQueryOptions({ search: search || undefined })
@@ -857,7 +859,7 @@ export default function MapScreen() {
           </Text>
           <Text style={styles.zoneBannerSub}>
             {zoneResult.smsCode
-              ? `SMS to ${zoneResult.smsCode} · ${zoneResult.hourlyRate?.toFixed(2)} BGN/hr`
+              ? `SMS to ${zoneResult.smsCode} · ${zoneResult.hourlyRate?.toFixed(2)} EUR/hr`
               : "Paid parking applies"}
           </Text>
         </View>
@@ -888,6 +890,12 @@ export default function MapScreen() {
                     <Text style={[styles.parkHereText, { color: colors.primary }]}>🅿️ Park</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={[styles.parkHereButton, { borderColor: colors.accent }]}
+                  onPress={() => navToLot(selectedLot.latitude, selectedLot.longitude, selectedLot.name)}
+                >
+                  <Text style={{ fontSize: 15 }}>🧭</Text>
+                </TouchableOpacity>
                 {accessToken && (
                   <TouchableOpacity
                     style={[styles.parkHereButton, { borderColor: favouriteIds.has(selectedLot.id) ? "#F59E0B" : colors.border }]}

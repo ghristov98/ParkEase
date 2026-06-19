@@ -14,7 +14,7 @@ const router = Router();
 // Burgas city center reference point
 const CITY_CENTER_LAT = 42.5048;
 const CITY_CENTER_LNG = 27.4626;
-const RATE_BGN_PER_HOUR = 1.5;
+const RATE_EUR_PER_HOUR = 1.5;
 const CO2_G_PER_KM = 120;
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -50,7 +50,7 @@ router.get("/dashboard", requireAuth, async (req, res): Promise<void> => {
       const d = new Date(s.startTime);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       if (key in spendingMap) {
-        spendingMap[key]! += ((s.paidMinutes ?? 0) / 60) * RATE_BGN_PER_HOUR;
+        spendingMap[key]! += ((s.paidMinutes ?? 0) / 60) * RATE_EUR_PER_HOUR;
       }
     }
   }

@@ -448,3 +448,23 @@ export type GetSessionsParams = {
   limit?: number;
 };
 
+
+export type Broadcast = {
+  id: string;
+  title: string;
+  body: string;
+  createdBy: string;
+  isPinned: boolean;
+  createdAt: string;
+};
+
+export type ParkingEvent = {
+  id: string;
+  title: string;
+  message: string;
+  zone?: string | null;
+  startTime: string;
+  endTime: string;
+  createdBy: string;
+  createdAt: string;
+};
