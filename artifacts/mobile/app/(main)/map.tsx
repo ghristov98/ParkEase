@@ -266,6 +266,9 @@ export default function MapScreen() {
   // Session state
   const [showStartSession, setShowStartSession] = useState(false);
   const [showExtendSession, setShowExtendSession] = useState(false);
+  const [mapTilesLoaded, setMapTilesLoaded] = useState(false);
+  const mapOverlayOpacity = useRef(new Animated.Value(1)).current;
+  const mapPulse = useRef(new Animated.Value(0.6)).current;
   const [extendingSessionId, setExtendingSessionId] = useState<string | null>(null);
 
   const { user, accessToken } = useAuth();
@@ -372,6 +375,29 @@ export default function MapScreen() {
       await AsyncStorage.setItem(PENALTY_STORAGE_KEY, JSON.stringify(markers));
     } catch { /* ignore */ }
   }, []);
+
+  // Map tile loading pulse animation
+  useEffect(() => {
+    if (mapTilesLoaded) return;
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(mapPulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(mapPulse, { toValue: 0.6, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [mapTilesLoaded]);
+
+  const handleMapReady = useCallback(() => {
+    setTimeout(() => {
+      Animated.timing(mapOverlayOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setMapTilesLoaded(true));
+    }, 600);
+  }, [mapOverlayOpacity]);
 
   // Filter panel animation
   useEffect(() => {
@@ -677,6 +703,7 @@ export default function MapScreen() {
         onRegionChangeComplete={setRegion}
         showsUserLocation={!!locationPermission}
         onLongPress={handleLongPress}
+        onMapReady={handleMapReady}
       >
         {/* Zone polygons */}
         {filteredZones.map((z: ZonePolygon) => {
@@ -737,6 +764,30 @@ export default function MapScreen() {
           </Marker>
         )}
       </MapView>
+
+      {/* Map tile loading overlay */}
+      {!mapTilesLoaded && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: colors.mapBackground,
+              opacity: mapOverlayOpacity,
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1,
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Animated.View style={{ opacity: mapPulse, alignItems: "center", gap: 12 }}>
+            <View style={[styles.mapLoaderBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.mapLoaderLetter}>P</Text>
+            </View>
+            <Text style={[styles.mapLoaderText, { color: colors.mutedForeground }]}>Loading map…</Text>
+          </Animated.View>
+        </Animated.View>
+      )}
 
       {/* Floating search + city selector */}
       <View style={[styles.floatingSearch, { top: insets.top + 10 }]}>
@@ -1460,6 +1511,9 @@ const styles = StyleSheet.create({
   lotActions: { flexDirection: "row", gap: 8, alignItems: "center" },
   parkHereButton: { height: 44, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   parkHereText: { fontSize: 13, fontWeight: "700" },
+  mapLoaderBadge: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 8 },
+  mapLoaderLetter: { fontSize: 32, fontWeight: "900", color: "#fff" },
+  mapLoaderText: { fontSize: 14, fontWeight: "500", letterSpacing: 0.3 },
   sessionCardWrapper: { position: "absolute", left: 12, right: 12, zIndex: 15 },
   detailsButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
   closeEmoji: { fontSize: 18, fontWeight: "600" },

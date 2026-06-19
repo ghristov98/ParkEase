@@ -15,7 +15,7 @@ import Svg, { Rect, Text as SvgText, Line } from "react-native-svg";
 
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { LoadingScreen } from "@/components/LoadingScreen";
+import { SkeletonDashboardCard } from "@/components/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -112,7 +112,20 @@ export default function DashboardScreen() {
     );
   }
 
-  if (isLoading) return <LoadingScreen />;
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+          <Text style={[styles.title, { color: colors.foreground }]}>Dashboard</Text>
+        </View>
+        <View style={{ paddingHorizontal: 16 }}>
+          <SkeletonDashboardCard />
+          <SkeletonDashboardCard />
+          <SkeletonDashboardCard />
+        </View>
+      </View>
+    );
+  }
 
   const loyalty = data?.loyalty;
   const tierColor = TIER_COLORS[loyalty?.tier ?? "Bronze"] ?? TIER_COLORS.Bronze!;

@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { LoadingScreen } from "@/components/LoadingScreen";
+import { SkeletonNotificationItem } from "@/components/Skeleton";
 
 export default function NotificationsScreen() {
   const colors = useColors();
@@ -23,8 +23,6 @@ export default function NotificationsScreen() {
   const { data: activeEvents = [], refetch: refetchEvents } = useQuery(getGetActiveEventsQueryOptions());
   const markAsReadMutation = useMarkNotificationRead();
   const markAllAsReadMutation = useMarkAllNotificationsRead();
-
-  if (isLoading) return <LoadingScreen />;
 
   const notifications = notificationsData?.notifications || [];
 
@@ -148,8 +146,15 @@ export default function NotificationsScreen() {
         </View>
       )}
 
+      {/* ── Skeleton while loading ───────────────────────────── */}
+      {isLoading && (
+        <View style={styles.sectionBlock}>
+          {[1, 2, 3, 4].map((k) => <SkeletonNotificationItem key={k} />)}
+        </View>
+      )}
+
       {/* ── User Notifications ──────────────────────────────── */}
-      {notifications.length > 0 && (
+      {!isLoading && notifications.length > 0 && (
         <View style={styles.sectionBlock}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Recent</Text>
           {notifications.map((item) => (
@@ -187,7 +192,7 @@ export default function NotificationsScreen() {
       )}
 
       {/* Empty state */}
-      {notifications.length === 0 && broadcasts.length === 0 && activeEvents.length === 0 && (
+      {!isLoading && notifications.length === 0 && broadcasts.length === 0 && activeEvents.length === 0 && (
         <View style={styles.empty}>
           <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
             <Text style={styles.emptyEmoji}>🔔</Text>
