@@ -7,11 +7,6 @@ import extrasRouter from "./extras";
 import vehiclesRouter from "./vehicles";
 import notificationsRouter from "./notifications";
 import aiRouter from "./ai";
-import sessionsRouter from "./sessions";
-import favouritesRouter from "./favourites";
-import dashboardRouter from "./dashboard";
-import broadcastsRouter from "./broadcasts";
-import eventsRouter from "./parkingEvents";
 
 const router: IRouter = Router();
 
@@ -22,11 +17,6 @@ router.use(parkingRouter);
 router.use(extrasRouter);
 router.use(vehiclesRouter);
 router.use(notificationsRouter);
-router.use(sessionsRouter);
-router.use(favouritesRouter);
-router.use(dashboardRouter);
-router.use(broadcastsRouter);
-router.use(eventsRouter);
 router.use(aiRouter);
 
 export default router;

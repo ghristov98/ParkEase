@@ -16,13 +16,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
-import { SkeletonVehicleCard } from "@/components/Skeleton";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function VehiclesScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { data: vehicles, isLoading, refetch } = useQuery(getGetVehiclesQueryOptions());
+
+  if (isLoading) return <LoadingScreen />;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -37,11 +39,6 @@ export default function VehiclesScreen() {
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
         }
-        ListHeaderComponent={isLoading ? (
-          <View>
-            {[1, 2, 3].map((k) => <SkeletonVehicleCard key={k} />)}
-          </View>
-        ) : null}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => router.push(`/vehicle/${item.id}`)}>
             <Card style={styles.vehicleCard}>

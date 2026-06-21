@@ -1,22 +1,9 @@
 import {
   getGetParkingLotsQueryOptions,
   getGetVehiclesQueryOptions,
-  getGetActiveSessionsQueryOptions,
-  getGetFavouritesQueryOptions,
   useCreateParkingLot,
   useDeleteParkingLot,
-  useStartSession,
-  useEndSession,
-  useExtendSession,
-  useAddFavourite,
-  useRemoveFavourite,
-  type StartSessionRequest,
 } from "@workspace/api-client-react";
-import { ActiveSessionCard } from "@/components/ActiveSessionCard";
-import { StartSessionModal } from "@/components/StartSessionModal";
-import { ExtendSessionModal } from "@/components/ExtendSessionModal";
-import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
-import { useSessionExpiryNotifications } from "@/hooks/useSessionExpiryNotifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -46,7 +33,6 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
-import { useNavigate } from "@/hooks/useNavigate";
 
 const PARKING_PIN = require("@/assets/images/image.png");
 
@@ -84,18 +70,14 @@ interface FilterState {
   zones: boolean;
   freeParking: boolean;
   paidParking: boolean;
-  parkingMachines: boolean;
   penaltyParking: boolean;
-  favourites: boolean;
 }
 
 const DEFAULT_FILTERS: FilterState = {
   zones: true,
   freeParking: true,
   paidParking: true,
-  parkingMachines: true,
   penaltyParking: true,
-  favourites: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -111,16 +93,6 @@ interface PenaltyMarker {
 }
 
 const PENALTY_STORAGE_KEY = "parkease_penalty_markers";
-
-const DEFAULT_PENALTY_MARKERS: PenaltyMarker[] = [
-  {
-    id: "default-oborishte-90",
-    latitude: 42.5051,
-    longitude: 27.4697,
-    timestamp: 0,
-    note: 'ул. "Оборище" №90',
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Memoized marker components
@@ -263,14 +235,6 @@ export default function MapScreen() {
   const [selectedPenalty, setSelectedPenalty] = useState<PenaltyMarker | null>(null);
   const [penaltyNote, setPenaltyNote] = useState("");
 
-  // Session state
-  const [showStartSession, setShowStartSession] = useState(false);
-  const [showExtendSession, setShowExtendSession] = useState(false);
-  const [mapTilesLoaded, setMapTilesLoaded] = useState(false);
-  const mapOverlayOpacity = useRef(new Animated.Value(1)).current;
-  const mapPulse = useRef(new Animated.Value(0.6)).current;
-  const [extendingSessionId, setExtendingSessionId] = useState<string | null>(null);
-
   const { user, accessToken } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -279,92 +243,24 @@ export default function MapScreen() {
   const createMutation = useCreateParkingLot();
   const deleteMutation = useDeleteParkingLot();
   const isSuperAdmin = user?.role === "superadmin";
-  const { navigate: navToLot } = useNavigate();
 
   const { data: parkingLots } = useQuery(
     getGetParkingLotsQueryOptions({ search: search || undefined })
   );
 
-  const { data: userVehicles } = useQuery({
-    ...getGetVehiclesQueryOptions(),
-    retry: 0,
-  });
-
-  const { data: activeSessions, refetch: refetchSessions } = useQuery({
-    ...getGetActiveSessionsQueryOptions(),
-    retry: 0,
-    refetchInterval: 30_000,
-    enabled: !!accessToken,
-  });
-
-  const { data: favouriteLots, refetch: refetchFavourites } = useQuery({
-    ...getGetFavouritesQueryOptions(),
-    retry: 0,
-    enabled: !!accessToken,
-  });
-
-  const favouriteIds = useMemo(() => new Set((favouriteLots ?? []).map((f: any) => f.id)), [favouriteLots]);
-
-  const addFavouriteMutation = useAddFavourite({
-    mutation: { onSuccess: () => refetchFavourites() },
-  });
-  const removeFavouriteMutation = useRemoveFavourite({
-    mutation: { onSuccess: () => refetchFavourites() },
-  });
-
-  const toggleFavourite = (lotId: string) => {
-    if (!accessToken) return;
-    if (favouriteIds.has(lotId)) {
-      removeFavouriteMutation.mutate({ lotId });
-    } else {
-      addFavouriteMutation.mutate({ lotId });
-    }
-  };
-
-  const startSessionMutation = useStartSession({
-    mutation: {
-      onSuccess: () => {
-        refetchSessions();
-        setShowStartSession(false);
-      },
-    },
-  });
-
-  const endSessionMutation = useEndSession({
-    mutation: {
-      onSuccess: () => refetchSessions(),
-    },
-  });
-
-  const extendSessionMutation = useExtendSession({
-    mutation: {
-      onSuccess: () => {
-        refetchSessions();
-        setShowExtendSession(false);
-        setExtendingSessionId(null);
-      },
-    },
-  });
-
-  useSessionExpiryNotifications(activeSessions, accessToken);
+  const { data: userVehicles } = useQuery(getGetVehiclesQueryOptions());
 
   const vehicleMarkers = useMemo(() =>
     (userVehicles ?? []).filter((v: any) => v.latitude != null && v.longitude != null),
     [userVehicles]
   );
 
-  // Load penalty markers from storage, always merging with defaults
+  // Load penalty markers from storage
   useEffect(() => {
     (async () => {
       try {
         const stored = await AsyncStorage.getItem(PENALTY_STORAGE_KEY);
-        const storedMarkers: PenaltyMarker[] = stored ? JSON.parse(stored) : [];
-        const storedIds = new Set(storedMarkers.map((m) => m.id));
-        const merged = [
-          ...DEFAULT_PENALTY_MARKERS.filter((m) => !storedIds.has(m.id)),
-          ...storedMarkers,
-        ];
-        setPenaltyMarkers(merged);
+        if (stored) setPenaltyMarkers(JSON.parse(stored));
       } catch { /* ignore */ }
     })();
   }, []);
@@ -376,34 +272,11 @@ export default function MapScreen() {
     } catch { /* ignore */ }
   }, []);
 
-  // Map tile loading pulse animation
-  useEffect(() => {
-    if (mapTilesLoaded) return;
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(mapPulse, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(mapPulse, { toValue: 0.6, duration: 800, useNativeDriver: true }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, [mapTilesLoaded]);
-
-  const handleMapReady = useCallback(() => {
-    setTimeout(() => {
-      Animated.timing(mapOverlayOpacity, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start(() => setMapTilesLoaded(true));
-    }, 600);
-  }, [mapOverlayOpacity]);
-
   // Filter panel animation
   useEffect(() => {
     Animated.spring(filterAnim, {
       toValue: filterOpen ? 1 : 0,
-      useNativeDriver: false,
+      useNativeDriver: true,
       tension: 80,
       friction: 12,
     }).start();
@@ -435,8 +308,8 @@ export default function MapScreen() {
         getDistanceMeters(nearbyMachinesCoord.latitude, nearbyMachinesCoord.longitude, m.lat, m.lng) <= 500
       );
     }
-    return filters.parkingMachines ? PARKING_MACHINES : [];
-  }, [filters.parkingMachines, nearbyMachinesCoord]);
+    return filters.paidParking ? PARKING_MACHINES : [];
+  }, [filters.paidParking, nearbyMachinesCoord]);
 
   const filteredParkingLots = useMemo(() => {
     const lots = (parkingLots ?? []) as any[];
@@ -447,13 +320,10 @@ export default function MapScreen() {
           if (!city || lot.latitude == null || lot.longitude == null) return true;
           return getDistanceMeters(lot.latitude, lot.longitude, city.center.latitude, city.center.longitude) <= 50000;
         });
-    return cityFiltered.filter((lot: any) => {
-      if (!filters.freeParking && lot.type === "free") return false;
-      if (!filters.paidParking && lot.type === "paid") return false;
-      if (filters.favourites && !favouriteIds.has(lot.id)) return false;
-      return true;
-    });
-  }, [parkingLots, filters.freeParking, filters.paidParking, filters.favourites, favouriteIds, selectedCity]);
+    return cityFiltered.filter((lot: any) =>
+      lot.type === "free" ? filters.freeParking : lot.type === "paid" ? filters.paidParking : true
+    );
+  }, [parkingLots, filters.freeParking, filters.paidParking, selectedCity]);
 
   const filteredPenaltyMarkers = useMemo(() =>
     isSuperAdmin && filters.penaltyParking ? penaltyMarkers : [],
@@ -501,7 +371,7 @@ export default function MapScreen() {
   useEffect(() => {
     Animated.spring(bannerAnim, {
       toValue: zoneResult.zone ? 1 : 0,
-      useNativeDriver: false,
+      useNativeDriver: true,
       tension: 80,
       friction: 12,
     }).start();
@@ -703,7 +573,6 @@ export default function MapScreen() {
         onRegionChangeComplete={setRegion}
         showsUserLocation={!!locationPermission}
         onLongPress={handleLongPress}
-        onMapReady={handleMapReady}
       >
         {/* Zone polygons */}
         {filteredZones.map((z: ZonePolygon) => {
@@ -765,34 +634,17 @@ export default function MapScreen() {
         )}
       </MapView>
 
-      {/* Map tile loading overlay */}
-      {!mapTilesLoaded && (
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: colors.mapBackground,
-              opacity: mapOverlayOpacity,
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 1,
-            },
-          ]}
-          pointerEvents="none"
-        >
-          <Animated.View style={{ opacity: mapPulse, alignItems: "center", gap: 12 }}>
-            <View style={[styles.mapLoaderBadge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.mapLoaderLetter}>P</Text>
-            </View>
-            <Text style={[styles.mapLoaderText, { color: colors.mutedForeground }]}>Loading map…</Text>
-          </Animated.View>
-        </Animated.View>
-      )}
-
       {/* Floating search + city selector */}
       <View style={[styles.floatingSearch, { top: insets.top + 10 }]}>
         <View style={styles.searchRow}>
           <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIconText="🔍" style={[styles.searchInput, { flex: 1 }]} />
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: colors.card }]}
+            onPress={() => setFilterOpen((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.filterBtnEmoji}>☰</Text>
+          </TouchableOpacity>
         </View>
 
         {/* City selector segmented control */}
@@ -820,12 +672,12 @@ export default function MapScreen() {
         </View>
       </View>
 
-      {/* Filter panel — animated slide-in above the FAB */}
+      {/* Filter panel — animated slide-in */}
       <Animated.View
         style={[
           styles.filterPanel,
           {
-            bottom: insets.bottom + 130,
+            top: insets.top + 122,
             transform: [{
               translateX: filterAnim.interpolate({
                 inputRange: [0, 1],
@@ -836,9 +688,9 @@ export default function MapScreen() {
               inputRange: [0, 1],
               outputRange: [0, 1],
             }),
-            pointerEvents: filterOpen ? "auto" : "none",
           },
         ]}
+        pointerEvents={filterOpen ? "auto" : "none"}
       >
         <Card padding={false}>
           <View style={styles.filterPanelInner}>
@@ -847,10 +699,6 @@ export default function MapScreen() {
             <FilterToggle label="🔵🟢 Zones" active={filters.zones} onPress={() => toggleFilter("zones")} />
             <FilterToggle label="🆓 Free Parking" active={filters.freeParking} onPress={() => toggleFilter("freeParking")} />
             <FilterToggle label="💳 Paid Parking" active={filters.paidParking} onPress={() => toggleFilter("paidParking")} />
-            <FilterToggle label="🅿️ Machines" active={filters.parkingMachines} onPress={() => toggleFilter("parkingMachines")} />
-            {accessToken && (
-              <FilterToggle label="⭐ Favourites" active={filters.favourites} onPress={() => toggleFilter("favourites")} />
-            )}
 
             {/* Penalty toggle — superadmin only */}
             {isSuperAdmin && (
@@ -889,7 +737,7 @@ export default function MapScreen() {
       <Animated.View
         style={[
           styles.zoneBanner,
-          { top: insets.top + 68, pointerEvents: "none" },
+          { top: insets.top + 68 },
           {
             opacity: bannerAnim,
             transform: [{ translateY: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
@@ -898,6 +746,7 @@ export default function MapScreen() {
             ? styles.zoneBannerBlue
             : styles.zoneBannerGreen,
         ]}
+        pointerEvents="none"
       >
         <Text style={styles.zoneBannerEmoji}>
           {zoneResult.zone === "blue" ? "🔵" : "🟢"}
@@ -910,7 +759,7 @@ export default function MapScreen() {
           </Text>
           <Text style={styles.zoneBannerSub}>
             {zoneResult.smsCode
-              ? `SMS to ${zoneResult.smsCode} · ${zoneResult.hourlyRate?.toFixed(2)} EUR/hr`
+              ? `SMS to ${zoneResult.smsCode} · ${zoneResult.hourlyRate?.toFixed(2)} BGN/hr`
               : "Paid parking applies"}
           </Text>
         </View>
@@ -928,84 +777,14 @@ export default function MapScreen() {
                 <Badge label={selectedLot.type} variant={selectedLot.type === "free" ? "free" : "paid"} />
               </View>
               <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>{selectedLot.address}</Text>
-              <View style={styles.lotActions}>
-                <TouchableOpacity style={[styles.detailsButton, { backgroundColor: colors.primary, flex: 1 }]} onPress={() => router.push(`/parking/${selectedLot.id}`)}>
-                  <Text style={styles.detailsButtonText}>View Details</Text>
-                  <Text style={styles.arrowEmoji}>→</Text>
-                </TouchableOpacity>
-                {accessToken && (
-                  <TouchableOpacity
-                    style={[styles.parkHereButton, { borderColor: colors.primary }]}
-                    onPress={() => { setShowStartSession(true); }}
-                  >
-                    <Text style={[styles.parkHereText, { color: colors.primary }]}>🅿️ Park</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[styles.parkHereButton, { borderColor: colors.accent }]}
-                  onPress={() => navToLot(selectedLot.latitude, selectedLot.longitude, selectedLot.name)}
-                >
-                  <Text style={{ fontSize: 15 }}>🧭</Text>
-                </TouchableOpacity>
-                {accessToken && (
-                  <TouchableOpacity
-                    style={[styles.parkHereButton, { borderColor: favouriteIds.has(selectedLot.id) ? "#F59E0B" : colors.border }]}
-                    onPress={() => toggleFavourite(selectedLot.id)}
-                  >
-                    <Text style={{ fontSize: 18 }}>{favouriteIds.has(selectedLot.id) ? "⭐" : "☆"}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              <TouchableOpacity style={[styles.detailsButton, { backgroundColor: colors.primary }]} onPress={() => router.push(`/parking/${selectedLot.id}`)}>
+                <Text style={styles.detailsButtonText}>View Details</Text>
+                <Text style={styles.arrowEmoji}>→</Text>
+              </TouchableOpacity>
             </View>
           </Card>
         </View>
       )}
-
-      {/* Notification permission prompt — shown above session card when permission not yet granted */}
-      {(activeSessions?.length ?? 0) > 0 && (
-        <View style={[styles.sessionCardWrapper, { bottom: insets.bottom + 58 + 128 + 8 + 8 }]}>
-          <NotificationPermissionBanner visible={true} />
-        </View>
-      )}
-
-      {/* Active session cards — just above the tab bar */}
-      {(activeSessions ?? []).map((session) => {
-        const vehicle = (userVehicles ?? []).find((v: any) => v.id === session.vehicleId);
-        return (
-          <View
-            key={session.id}
-            style={[styles.sessionCardWrapper, { bottom: insets.bottom + 58 }]}
-          >
-            <ActiveSessionCard
-              session={session}
-              vehicleName={vehicle?.name}
-              onEnd={() => endSessionMutation.mutate({ id: session.id })}
-              onExtend={() => {
-                setExtendingSessionId(session.id);
-                setShowExtendSession(true);
-              }}
-              isEnding={endSessionMutation.isPending}
-            />
-          </View>
-        );
-      })}
-
-      {/* Filter FAB — moves up when a session card is visible */}
-      <TouchableOpacity
-        style={[
-          styles.filterFab,
-          {
-            bottom: (activeSessions?.length ?? 0) > 0
-              ? insets.bottom + 58 + 128 + 8
-              : insets.bottom + 72,
-            backgroundColor: filterOpen ? colors.primary : colors.card,
-          },
-        ]}
-        onPress={() => setFilterOpen((v) => !v)}
-        activeOpacity={0.8}
-      >
-        <Text style={[styles.filterFabEmoji, filterOpen && { color: "white" }]}>☰</Text>
-      </TouchableOpacity>
 
       {isSuperAdmin && (
         <TouchableOpacity style={[styles.adminFab, { bottom: 100 + insets.bottom, backgroundColor: colors.primary }]} onPress={() => router.push("/admin")}>
@@ -1223,34 +1002,6 @@ export default function MapScreen() {
           </ScrollView>
         </View>
       </Modal>
-
-      {/* Start Session Modal */}
-      <StartSessionModal
-        visible={showStartSession}
-        lot={selectedLot ? {
-          id: selectedLot.id,
-          name: selectedLot.name,
-          address: selectedLot.address,
-          latitude: selectedLot.latitude,
-          longitude: selectedLot.longitude,
-        } : null}
-        vehicles={(userVehicles ?? []) as { id: string; name: string; licensePlate: string }[]}
-        onStart={(req: StartSessionRequest) => startSessionMutation.mutate({ data: req })}
-        onClose={() => setShowStartSession(false)}
-        isLoading={startSessionMutation.isPending}
-      />
-
-      {/* Extend Session Modal */}
-      <ExtendSessionModal
-        visible={showExtendSession}
-        onExtend={(minutes) => {
-          if (extendingSessionId) {
-            extendSessionMutation.mutate({ id: extendingSessionId, data: { addMinutes: minutes } });
-          }
-        }}
-        onClose={() => { setShowExtendSession(false); setExtendingSessionId(null); }}
-        isLoading={extendSessionMutation.isPending}
-      />
     </View>
   );
 }
@@ -1349,24 +1100,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   filterBtnEmoji: { fontSize: 22 },
-  filterFab: {
-    position: "absolute",
-    right: 16,
-    width: 50,
-    height: 50,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E2E7F5",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 5,
-    zIndex: 11,
-  },
-  filterFabEmoji: { fontSize: 20 },
   floatingSearch: { position: "absolute", left: 16, right: 16, zIndex: 10 },
   searchInput: { backgroundColor: "white", height: 50 },
   citySelector: {
@@ -1508,13 +1241,6 @@ const styles = StyleSheet.create({
   lotName: { fontSize: 18, fontWeight: "700", flex: 1, marginRight: 8 },
   lotAddress: { fontSize: 14, marginBottom: 16 },
   detailsButton: { flexDirection: "row", height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", gap: 8 },
-  lotActions: { flexDirection: "row", gap: 8, alignItems: "center" },
-  parkHereButton: { height: 44, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
-  parkHereText: { fontSize: 13, fontWeight: "700" },
-  mapLoaderBadge: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 8 },
-  mapLoaderLetter: { fontSize: 32, fontWeight: "900", color: "#fff" },
-  mapLoaderText: { fontSize: 14, fontWeight: "500", letterSpacing: 0.3 },
-  sessionCardWrapper: { position: "absolute", left: 12, right: 12, zIndex: 15 },
   detailsButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
   closeEmoji: { fontSize: 18, fontWeight: "600" },
   arrowEmoji: { fontSize: 16, color: "white", fontWeight: "600" },

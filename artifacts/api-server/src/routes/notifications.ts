@@ -25,15 +25,6 @@ router.get("/notifications/unread-count", requireAuth, async (req, res): Promise
   res.json({ count: Number(unread) });
 });
 
-router.post("/notifications/self", requireAuth, async (req, res): Promise<void> => {
-  const { title, body, type, linkType, linkId } = req.body;
-  if (!title || !body) { res.status(400).json({ error: "validation_error", message: "Title and body required" }); return; }
-  const [notification] = await db.insert(notificationsTable).values({
-    userId: req.user!.userId, title, body, type: type || "reminder", linkType, linkId,
-  }).returning();
-  res.status(201).json(notification);
-});
-
 router.post("/notifications", requireSuperAdmin, async (req, res): Promise<void> => {
   const { title, body, type, userIds, linkType, linkId } = req.body;
   if (!title || !body) { res.status(400).json({ error: "validation_error", message: "Title and body required" }); return; }

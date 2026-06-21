@@ -1,10 +1,5 @@
-import {
-  getGetParkingLotByIdQueryOptions,
-  getCheckFavouriteQueryOptions,
-  useAddFavourite,
-  useRemoveFavourite,
-} from "@workspace/api-client-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getGetParkingLotByIdQueryOptions } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
@@ -26,7 +21,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useColors } from "@/hooks/useColors";
-import { useAuth } from "@/contexts/AuthContext";
 
 const SCREEN_W = Dimensions.get("window").width;
 
@@ -45,24 +39,6 @@ export default function ParkingLotDetails() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { accessToken } = useAuth();
-  const queryClient = useQueryClient();
-
-  const { data: favCheck, refetch: refetchFav } = useQuery({
-    ...getCheckFavouriteQueryOptions(id!),
-    enabled: !!accessToken && !!id,
-    retry: 0,
-  });
-  const isFavourite = favCheck?.isFavourite ?? false;
-
-  const addFav = useAddFavourite({ mutation: { onSuccess: () => { refetchFav(); queryClient.invalidateQueries({ queryKey: ['getFavourites'] }); } } });
-  const removeFav = useRemoveFavourite({ mutation: { onSuccess: () => { refetchFav(); queryClient.invalidateQueries({ queryKey: ['getFavourites'] }); } } });
-
-  const toggleFavourite = () => {
-    if (!accessToken) return;
-    if (isFavourite) removeFav.mutate({ lotId: id! });
-    else addFav.mutate({ lotId: id! });
-  };
 
   if (isLoading) return <LoadingScreen />;
   if (!lot) return null;
@@ -127,7 +103,7 @@ export default function ParkingLotDetails() {
         </View>
 
         <View style={styles.content}>
-          {/* Name + type badge + favourite */}
+          {/* Name + type badge */}
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.name, { color: colors.foreground }]}>{lot.name}</Text>
@@ -141,14 +117,6 @@ export default function ParkingLotDetails() {
               variant={lot.type === "free" ? "free" : "paid"}
               style={styles.badge}
             />
-            {accessToken && (
-              <TouchableOpacity
-                onPress={toggleFavourite}
-                style={[styles.favButton, { borderColor: isFavourite ? "#F59E0B" : colors.border }]}
-              >
-                <Text style={{ fontSize: 22 }}>{isFavourite ? "⭐" : "☆"}</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Opening hours */}
@@ -307,15 +275,6 @@ const styles = StyleSheet.create({
   addressRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   address: { fontSize: 14, flex: 1 },
   badge: { paddingHorizontal: 12, paddingVertical: 4, marginLeft: 8 },
-  favButton: {
-    marginLeft: 8,
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-  },
   // Hours
   hoursCard: { marginBottom: 20 },
   hoursRow: { flexDirection: "row", alignItems: "center" },

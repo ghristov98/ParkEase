@@ -16,10 +16,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import { LanguageProvider } from "@/contexts/LanguageContext";
-import { SplashOverlay } from "@/components/SplashOverlay";
-import { RouteProgressBar } from "@/components/RouteProgressBar";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,29 +55,21 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  const isReady = fontsLoaded || !!fontError;
-
   if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <LanguageProvider>
-          <ErrorBoundary>
-            <QueryClientProvider client={queryClient}>
-              <AuthProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <KeyboardProvider>
-                    <RouteProgressBar />
-                    <RootLayoutNav />
-                    <SplashOverlay isReady={isReady} />
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </AuthProvider>
-            </QueryClientProvider>
-          </ErrorBoundary>
-        </LanguageProvider>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <KeyboardProvider>
+                <RootLayoutNav />
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
