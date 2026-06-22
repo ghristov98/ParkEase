@@ -1,5 +1,6 @@
 import { getGetUsersQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   FlatList,
@@ -30,7 +31,7 @@ export default function AdminUsers() {
           placeholder="Search users..."
           value={search}
           onChangeText={setSearch}
-          leftIconText="🔍"
+          leftIcon={Search}
         />
       </View>
 

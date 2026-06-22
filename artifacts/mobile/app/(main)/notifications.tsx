@@ -1,6 +1,7 @@
 
 import { getGetNotificationsQueryOptions, useMarkAllNotificationsRead, useMarkNotificationRead } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
+import { Bell, Clock, Info, Tag } from "lucide-react-native";
 import React from "react";
 import {
   FlatList,
@@ -14,6 +15,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { LoadingScreen } from "@/components/LoadingScreen";
+
+type LucideIcon = React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+
+function getTypeIcon(type: string): LucideIcon {
+  switch (type) {
+    case "reminder": return Clock;
+    case "promotion": return Tag;
+    default: return Info;
+  }
+}
 
 export default function NotificationsScreen() {
   const colors = useColors();
@@ -41,14 +52,6 @@ export default function NotificationsScreen() {
       refetch();
     } catch (err) {
       // Ignore
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "reminder": return "🕒";
-      case "promotion": return "🏷️";
-      default: return "ℹ️";
     }
   };
 
@@ -85,40 +88,47 @@ export default function NotificationsScreen() {
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => handleMarkAsRead(item.id)}
-            style={[
-              styles.notificationItem,
-              { backgroundColor: colors.card },
-              !item.isRead && {
-                borderLeftWidth: 4,
-                borderLeftColor: colors.primary,
-                backgroundColor: colors.primary + "08",
-              },
-            ]}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: colors.muted }]}>
-              <Text style={styles.typeIcon}>{getTypeIcon(item.type)}</Text>
-            </View>
-            <View style={styles.content}>
-              <View style={styles.topRow}>
-                <Text style={[styles.notifTitle, { color: colors.foreground }, !item.isRead && styles.bold]}>
-                  {item.title}
-                </Text>
-                <Text style={[styles.time, { color: colors.mutedForeground }]}>
-                  {formatDate(item.createdAt)}
-                </Text>
+        renderItem={({ item }) => {
+          const TypeIcon = getTypeIcon(item.type);
+          return (
+            <TouchableOpacity
+              onPress={() => handleMarkAsRead(item.id)}
+              style={[
+                styles.notificationItem,
+                { backgroundColor: colors.card },
+                !item.isRead && {
+                  borderLeftWidth: 4,
+                  borderLeftColor: colors.primary,
+                  backgroundColor: colors.primary + "08",
+                },
+              ]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: item.isRead ? colors.muted : colors.primary + "18" }]}>
+                <TypeIcon
+                  size={18}
+                  color={item.isRead ? colors.mutedForeground : colors.primary}
+                  strokeWidth={2}
+                />
               </View>
-              <Text style={[styles.body, { color: colors.mutedForeground }]}>{item.body}</Text>
-            </View>
-            {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
-          </TouchableOpacity>
-        )}
+              <View style={styles.content}>
+                <View style={styles.topRow}>
+                  <Text style={[styles.notifTitle, { color: colors.foreground }, !item.isRead && styles.bold]}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.time, { color: colors.mutedForeground }]}>
+                    {formatDate(item.createdAt)}
+                  </Text>
+                </View>
+                <Text style={[styles.body, { color: colors.mutedForeground }]}>{item.body}</Text>
+              </View>
+              {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
-              <Text style={styles.emptyEmoji}>🔔</Text>
+              <Bell size={40} color={colors.mutedForeground} strokeWidth={1.5} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No notifications</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
@@ -175,7 +185,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  typeIcon: { fontSize: 20 },
   unreadDot: {
     width: 8,
     height: 8,
@@ -211,9 +220,6 @@ const styles = StyleSheet.create({
     marginTop: 80,
     alignItems: "center",
     paddingHorizontal: 40,
-  },
-  emptyEmoji: {
-    fontSize: 40,
   },
   emptyIcon: {
     width: 80,

@@ -1,8 +1,10 @@
 import { useRouter } from "expo-router";
+import { AlertCircle, ChevronLeft, Lock, Mail, Phone } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -54,9 +56,15 @@ export default function RegisterScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
     >
       <View style={[styles.headerActions, { top: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backEmoji, { color: colors.foreground }]}>←</Text>
-        </TouchableOpacity>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [
+            styles.backButton,
+            { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+          ]}
+        >
+          <ChevronLeft size={28} color={colors.foreground} strokeWidth={2} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -74,7 +82,7 @@ export default function RegisterScreen() {
         <View style={styles.form}>
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: colors.destructive + "10" }]}>
-              <Text style={styles.alertEmoji}>⚠️</Text>
+              <AlertCircle size={18} color={colors.destructive} strokeWidth={2} />
               <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
           )}
@@ -106,7 +114,7 @@ export default function RegisterScreen() {
             onChangeText={(text) => setForm({ ...form, email: text })}
             keyboardType="email-address"
             autoCapitalize="none"
-            leftIconText="✉️"
+            leftIcon={Mail}
           />
 
           <Input
@@ -115,7 +123,7 @@ export default function RegisterScreen() {
             value={form.phone}
             onChangeText={(text) => setForm({ ...form, phone: text })}
             keyboardType="phone-pad"
-            leftIconText="📞"
+            leftIcon={Phone}
           />
 
           <Input
@@ -124,7 +132,7 @@ export default function RegisterScreen() {
             value={form.password}
             onChangeText={(text) => setForm({ ...form, password: text })}
             secureTextEntry
-            leftIconText="🔒"
+            leftIcon={Lock}
           />
 
           <Button
@@ -154,13 +162,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     zIndex: 10,
-  },
-  backEmoji: {
-    fontSize: 22,
-    fontWeight: "600",
-  },
-  alertEmoji: {
-    fontSize: 18,
   },
   backButton: {
     width: 40,

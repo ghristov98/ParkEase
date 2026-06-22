@@ -1,8 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { AlertCircle, Lock, Mail } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -73,7 +73,7 @@ export default function LoginScreen() {
         <View style={styles.form}>
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: colors.destructive + "10" }]}>
-              <Text style={[styles.alertEmoji, { color: colors.destructive }]}>⚠️</Text>
+              <AlertCircle size={18} color={colors.destructive} strokeWidth={2} />
               <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
           )}
@@ -85,7 +85,7 @@ export default function LoginScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            leftIconText="✉️"
+            leftIcon={Mail}
           />
 
           <Input
@@ -94,7 +94,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            leftIconText="🔒"
+            leftIcon={Lock}
           />
 
           <TouchableOpacity
@@ -174,9 +174,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
     gap: 8,
-  },
-  alertEmoji: {
-    fontSize: 18,
   },
   errorText: {
     fontSize: 14,

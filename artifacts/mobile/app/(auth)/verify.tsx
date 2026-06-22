@@ -1,8 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { AlertCircle, ChevronLeft } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -48,9 +50,15 @@ export default function VerifyScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
     >
       <View style={[styles.headerActions, { top: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backEmoji, { color: colors.foreground }]}>←</Text>
-        </TouchableOpacity>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [
+            styles.backButton,
+            { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+          ]}
+        >
+          <ChevronLeft size={28} color={colors.foreground} strokeWidth={2} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -69,7 +77,7 @@ export default function VerifyScreen() {
         <View style={styles.form}>
           {error && (
             <View style={[styles.errorBanner, { backgroundColor: colors.destructive + "10" }]}>
-              <Text style={styles.alertEmoji}>⚠️</Text>
+              <AlertCircle size={18} color={colors.destructive} strokeWidth={2} />
               <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
           )}
@@ -108,13 +116,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     zIndex: 10,
-  },
-  backEmoji: {
-    fontSize: 22,
-    fontWeight: "600",
-  },
-  alertEmoji: {
-    fontSize: 18,
   },
   backButton: {
     width: 40,

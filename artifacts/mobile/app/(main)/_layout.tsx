@@ -3,14 +3,15 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import React from "react";
+import { Bell, Car, Map, UserCircle } from "lucide-react-native";
+import React, { useMemo } from "react";
 import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { getGetUnreadNotificationCountQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 
-function UnreadBadge({ color: _color }: { color: string }) {
+const UnreadBadge = React.memo(function UnreadBadge({ color: _color }: { color: string }) {
   const { data } = useQuery(getGetUnreadNotificationCountQueryOptions());
   const count = data?.count ?? 0;
   if (!count) return null;
@@ -19,7 +20,7 @@ function UnreadBadge({ color: _color }: { color: string }) {
       <Text style={styles.badgeText}>{count > 99 ? "99+" : String(count)}</Text>
     </View>
   );
-}
+});
 
 function NativeTabLayout() {
   return (
@@ -49,46 +50,53 @@ function ClassicTabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
+
+  const screenOptions = useMemo(() => ({
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.mutedForeground,
+    headerShown: false,
+    tabBarStyle: {
+      position: "absolute" as const,
+      backgroundColor: isIOS ? "transparent" : colors.card,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      elevation: 0,
+      ...(Platform.OS === "web" ? { height: 64 } : {}),
+    },
+    tabBarBackground: () =>
+      isIOS ? (
+        <BlurView
+          intensity={95}
+          tint={isDark ? "dark" : "light"}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null,
+    tabBarLabelStyle: {
+      fontSize: 11,
+      fontFamily: "Inter_500Medium",
+      marginBottom: 4,
+    },
+  }), [colors, isIOS, isDark]);
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: false,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.card,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          elevation: 0,
-          ...(isWeb ? { height: 64 } : {}),
-        },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView
-              intensity={95}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : null,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontFamily: "Inter_500Medium",
-          marginBottom: 4,
-        },
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="map"
         options={{
           title: "Map",
-          tabBarIcon: ({ focused }) =>
+          tabBarIcon: ({ focused, color }) =>
             isIOS ? (
-              <SymbolView name={focused ? "map.fill" : "map"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
+              <SymbolView
+                name={focused ? "map.fill" : "map"}
+                tintColor={color}
+                size={24}
+              />
             ) : (
-              <Text style={styles.tabEmoji}>🗺️</Text>
+              <Map
+                size={24}
+                color={color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
             ),
         }}
       />
@@ -96,11 +104,19 @@ function ClassicTabLayout() {
         name="vehicles"
         options={{
           title: "Vehicles",
-          tabBarIcon: ({ focused }) =>
+          tabBarIcon: ({ focused, color }) =>
             isIOS ? (
-              <SymbolView name={focused ? "car.fill" : "car"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
+              <SymbolView
+                name={focused ? "car.fill" : "car"}
+                tintColor={color}
+                size={24}
+              />
             ) : (
-              <Text style={styles.tabEmoji}>🚗</Text>
+              <Car
+                size={24}
+                color={color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
             ),
         }}
       />
@@ -108,11 +124,22 @@ function ClassicTabLayout() {
         name="notifications"
         options={{
           title: "Alerts",
-          tabBarIcon: ({ focused }) =>
+          tabBarIcon: ({ focused, color }) =>
             isIOS ? (
-              <SymbolView name={focused ? "bell.fill" : "bell"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
+              <SymbolView
+                name={focused ? "bell.fill" : "bell"}
+                tintColor={color}
+                size={24}
+              />
             ) : (
-              <Text style={styles.tabEmoji}>🔔</Text>
+              <View>
+                <Bell
+                  size={24}
+                  color={color}
+                  strokeWidth={focused ? 2.5 : 2}
+                />
+                <UnreadBadge color={color} />
+              </View>
             ),
         }}
       />
@@ -120,11 +147,19 @@ function ClassicTabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ focused }) =>
+          tabBarIcon: ({ focused, color }) =>
             isIOS ? (
-              <SymbolView name={focused ? "person.fill" : "person"} tintColor={focused ? colors.primary : colors.mutedForeground} size={24} />
+              <SymbolView
+                name={focused ? "person.fill" : "person"}
+                tintColor={color}
+                size={24}
+              />
             ) : (
-              <Text style={styles.tabEmoji}>👤</Text>
+              <UserCircle
+                size={24}
+                color={color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
             ),
         }}
       />
@@ -140,9 +175,6 @@ export default function MainTabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabEmoji: {
-    fontSize: 22,
-  },
   badge: {
     backgroundColor: "#EF4444",
     borderRadius: 8,
@@ -151,12 +183,6 @@ const styles = StyleSheet.create({
     minWidth: 16,
     alignItems: "center",
     justifyContent: "center",
-  },
-  badgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#EF4444",
   },
   badgeText: {
     color: "white",

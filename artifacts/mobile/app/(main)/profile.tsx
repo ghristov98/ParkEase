@@ -2,10 +2,12 @@
 import { useUpdateProfile } from "@workspace/api-client-react";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { Camera, ChevronRight, LogOut, Mail, Phone, Shield } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Alert,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -97,7 +99,13 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileHeader}>
-          <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
+          <Pressable
+            onPress={pickImage}
+            style={({ pressed }) => [
+              styles.avatarContainer,
+              { opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
+            ]}
+          >
             {user?.photoUrl ? (
               <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
             ) : (
@@ -108,10 +116,10 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             )}
-            <View style={[styles.editBadge, { backgroundColor: colors.card }]}>
-              <Text style={styles.cameraEmoji}>📷</Text>
+            <View style={[styles.editBadge, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+              <Camera size={14} color={colors.foreground} strokeWidth={2} />
             </View>
-          </TouchableOpacity>
+          </Pressable>
           <Text style={[styles.userName, { color: colors.foreground }]}>
             {user?.firstName} {user?.lastName}
           </Text>
@@ -156,19 +164,25 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.infoList}>
               <View style={styles.infoItem}>
-                <Text style={styles.infoEmoji}>📞</Text>
+                <View style={[styles.infoIconWrap, { backgroundColor: colors.primary + "15" }]}>
+                  <Phone size={16} color={colors.primary} strokeWidth={2} />
+                </View>
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
                   {user?.phone || "No phone added"}
                 </Text>
               </View>
               <View style={styles.infoItem}>
-                <Text style={styles.infoEmoji}>✉️</Text>
+                <View style={[styles.infoIconWrap, { backgroundColor: colors.primary + "15" }]}>
+                  <Mail size={16} color={colors.primary} strokeWidth={2} />
+                </View>
                 <Text style={[styles.infoText, { color: colors.foreground }]}>{user?.email}</Text>
               </View>
               <View style={styles.infoItem}>
-                <Text style={styles.infoEmoji}>🛡️</Text>
+                <View style={[styles.infoIconWrap, { backgroundColor: (user?.isVerified ? "#22C55E" : "#F97316") + "20" }]}>
+                  <Shield size={16} color={user?.isVerified ? "#22C55E" : "#F97316"} strokeWidth={2} />
+                </View>
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
-                  Status: {user?.isVerified ? "Verified" : "Unverified"}
+                  {user?.isVerified ? "Verified Account" : "Unverified"}
                 </Text>
               </View>
             </View>
@@ -183,7 +197,7 @@ export default function ProfileScreen() {
                   <Text style={styles.adminTitle}>Admin Dashboard</Text>
                   <Text style={styles.adminSubtitle}>Manage users, lots and more</Text>
                 </View>
-                <Text style={styles.arrowEmoji}>→</Text>
+                <ChevronRight size={22} color="white" strokeWidth={2.5} />
               </View>
             </Card>
           </TouchableOpacity>
@@ -193,7 +207,7 @@ export default function ProfileScreen() {
           variant="outline"
           title="Sign Out"
           onPress={logout}
-          icon="🚪"
+          icon={LogOut}
           style={styles.signOutButton}
           fullWidth
         />
@@ -241,19 +255,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "white",
   },
-  cameraEmoji: {
-    fontSize: 14,
-  },
-  infoEmoji: {
-    fontSize: 18,
-    width: 24,
-    textAlign: "center",
-  },
-  arrowEmoji: {
-    fontSize: 20,
-    color: "white",
-    fontWeight: "600",
-  },
   editBadge: {
     position: "absolute",
     right: 0,
@@ -298,15 +299,23 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   infoList: {
-    gap: 16,
+    gap: 14,
   },
   infoItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
+  infoIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   infoText: {
     fontSize: 16,
+    flex: 1,
   },
   adminCard: {
     marginBottom: 24,

@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { AlertCircle, X } from "lucide-react-native";
 import { reloadAppAsync } from "expo";
 import React, { useState } from "react";
 import {
@@ -28,8 +28,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   const handleRestart = async () => {
     try {
       await reloadAppAsync();
-    } catch (restartError) {
-      console.error("Failed to restart app:", restartError);
+    } catch {
       resetError();
     }
   };
@@ -61,10 +60,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
               top: insets.top + 16,
               backgroundColor: colors.card,
               opacity: pressed ? 0.8 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
             },
           ]}
         >
-          <Feather name="alert-circle" size={20} color={colors.foreground} />
+          <AlertCircle size={20} color={colors.foreground} strokeWidth={2} />
         </Pressable>
       ) : null}
 
@@ -83,17 +83,12 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             styles.button,
             {
               backgroundColor: colors.primary,
-              opacity: pressed ? 0.9 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
+              opacity: pressed ? 0.88 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
             },
           ]}
         >
-          <Text
-            style={[
-              styles.buttonText,
-              { color: colors.primaryForeground },
-            ]}
-          >
+          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>
             Try Again
           </Text>
         </Pressable>
@@ -108,17 +103,9 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         >
           <View style={styles.modalOverlay}>
             <View
-              style={[
-                styles.modalContainer,
-                { backgroundColor: colors.background },
-              ]}
+              style={[styles.modalContainer, { backgroundColor: colors.background }]}
             >
-              <View
-                style={[
-                  styles.modalHeader,
-                  { borderBottomColor: colors.border },
-                ]}
-              >
+              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
                 <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                   Error Details
                 </Text>
@@ -131,7 +118,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                     { opacity: pressed ? 0.6 : 1 },
                   ]}
                 >
-                  <Feather name="x" size={24} color={colors.foreground} />
+                  <X size={24} color={colors.foreground} strokeWidth={2} />
                 </Pressable>
               </View>
 
@@ -143,19 +130,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                 ]}
                 showsVerticalScrollIndicator
               >
-                <View
-                  style={[
-                    styles.errorContainer,
-                    { backgroundColor: colors.card },
-                  ]}
-                >
+                <View style={[styles.errorContainer, { backgroundColor: colors.card }]}>
                   <Text
                     style={[
                       styles.errorText,
-                      {
-                        color: colors.foreground,
-                        fontFamily: monoFont,
-                      },
+                      { color: colors.foreground, fontFamily: monoFont },
                     ]}
                     selectable
                   >
@@ -215,10 +194,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     minWidth: 200,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
@@ -258,12 +234,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  modalScrollView: {
-    flex: 1,
-  },
-  modalScrollContent: {
-    padding: 16,
-  },
+  modalScrollView: { flex: 1 },
+  modalScrollContent: { padding: 16 },
   errorContainer: {
     width: "100%",
     borderRadius: 8,

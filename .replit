@@ -48,3 +48,4 @@ externalPort = 3001
 JWT_SECRET = "45b530e9fbe320f8cc64a9f6464654d94de364337c2df42da4a53a6411e2fbda924bb76ceaf3a89f1b9491137abf6f93b3d0a22ebbb5cc366127a90721d9804a"
 
 [nix]
+channel = "stable-25_05"

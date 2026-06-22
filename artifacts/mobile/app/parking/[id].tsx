@@ -1,16 +1,17 @@
 import { getGetParkingLotByIdQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ChevronLeft, Clock, MapPin, Navigation, Star } from "lucide-react-native";
 import React from "react";
 import {
   Dimensions,
   Image,
   Linking,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { MapView, Marker } from "@/components/NativeMap";
@@ -71,7 +72,6 @@ export default function ParkingLotDetails() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        {/* Photo carousel */}
         <View style={styles.imageContainer}>
           {orderedPhotos.length > 0 ? (
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
@@ -89,12 +89,15 @@ export default function ParkingLotDetails() {
               <Text style={styles.imageEmoji}>🅿️</Text>
             </View>
           )}
-          <TouchableOpacity
-            style={[styles.backButton, { top: insets.top + 10 }]}
+          <Pressable
+            style={({ pressed }) => [
+              styles.backButton,
+              { top: insets.top + 10, opacity: pressed ? 0.8 : 1 },
+            ]}
             onPress={() => router.back()}
           >
-            <Text style={styles.backEmoji}>←</Text>
-          </TouchableOpacity>
+            <ChevronLeft size={24} color="white" strokeWidth={2.5} />
+          </Pressable>
           {orderedPhotos.length > 1 && (
             <View style={styles.photoCount}>
               <Text style={styles.photoCountText}>1 / {orderedPhotos.length}</Text>
@@ -103,12 +106,11 @@ export default function ParkingLotDetails() {
         </View>
 
         <View style={styles.content}>
-          {/* Name + type badge */}
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.name, { color: colors.foreground }]}>{lot.name}</Text>
               <View style={styles.addressRow}>
-                <Text style={styles.locationEmoji}>📍</Text>
+                <MapPin size={14} color={colors.mutedForeground} strokeWidth={2} />
                 <Text style={[styles.address, { color: colors.mutedForeground }]}>{lot.address}</Text>
               </View>
             </View>
@@ -119,11 +121,10 @@ export default function ParkingLotDetails() {
             />
           </View>
 
-          {/* Opening hours */}
           {lotAny.openingHours ? (
             <Card style={styles.hoursCard}>
               <View style={styles.hoursRow}>
-                <Text style={styles.clockEmoji}>⏰</Text>
+                <Clock size={22} color={colors.primary} strokeWidth={2} style={{ marginRight: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.hoursLabel, { color: colors.mutedForeground }]}>Opening Hours</Text>
                   <Text style={[styles.hoursValue, { color: colors.foreground }]}>{lotAny.openingHours}</Text>
@@ -132,7 +133,6 @@ export default function ParkingLotDetails() {
             </Card>
           ) : null}
 
-          {/* Amenities from new boolean fields */}
           {activeAmenities.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Amenities</Text>
@@ -150,14 +150,13 @@ export default function ParkingLotDetails() {
             </View>
           )}
 
-          {/* Legacy extras (from extras table) */}
           {lot.extras && lot.extras.length > 0 && (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Extra Services</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.extrasList}>
                 {lot.extras.map((extra) => (
                   <View key={extra.id} style={[styles.extraChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Text style={styles.extraEmoji}>⭐</Text>
+                    <Star size={14} color="#F59E0B" strokeWidth={2} />
                     <Text style={[styles.extraText, { color: colors.foreground }]}>{extra.name}</Text>
                   </View>
                 ))}
@@ -165,7 +164,6 @@ export default function ParkingLotDetails() {
             </View>
           )}
 
-          {/* Mini map */}
           <View style={styles.mapContainer}>
             {Platform.OS !== "web" ? (
               <MapView
@@ -193,10 +191,9 @@ export default function ParkingLotDetails() {
                 <Text style={{ color: colors.mutedForeground }}>Map view not available on web</Text>
               </View>
             )}
-            <TouchableOpacity style={styles.mapOverlay} onPress={openInMaps} />
+            <Pressable style={styles.mapOverlay} onPress={openInMaps} />
           </View>
 
-          {/* Description */}
           {lot.description ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Description</Text>
@@ -207,7 +204,7 @@ export default function ParkingLotDetails() {
           <Button
             title="Get Directions"
             onPress={openInMaps}
-            icon="🧭"
+            icon={Navigation}
             fullWidth
             style={styles.directionsButton}
           />
@@ -229,11 +226,6 @@ const styles = StyleSheet.create({
     height: 300,
   },
   imageEmoji: { fontSize: 64 },
-  backEmoji: { fontSize: 22, color: "white", fontWeight: "600" },
-  locationEmoji: { fontSize: 14 },
-  extraEmoji: { fontSize: 14 },
-  clockEmoji: { fontSize: 22, marginRight: 12 },
-  amenityEmoji: { fontSize: 16 },
   photoPlaceholder: {
     flex: 1,
     alignItems: "center",
@@ -275,12 +267,10 @@ const styles = StyleSheet.create({
   addressRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   address: { fontSize: 14, flex: 1 },
   badge: { paddingHorizontal: 12, paddingVertical: 4, marginLeft: 8 },
-  // Hours
   hoursCard: { marginBottom: 20 },
   hoursRow: { flexDirection: "row", alignItems: "center" },
   hoursLabel: { fontSize: 12, fontWeight: "600", marginBottom: 2 },
   hoursValue: { fontSize: 15, fontWeight: "500" },
-  // Amenities
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
   amenityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -293,8 +283,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 6,
   },
+  amenityEmoji: { fontSize: 16 },
   amenityText: { fontSize: 13, fontWeight: "600" },
-  // Extras
   extrasList: { gap: 8 },
   extraChip: {
     flexDirection: "row",
@@ -306,7 +296,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   extraText: { fontSize: 14, fontWeight: "500" },
-  // Mini map
   mapContainer: {
     height: 180,
     borderRadius: 16,
@@ -323,7 +312,6 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderColor: "white",
   },
-  // Description
   description: { fontSize: 15, lineHeight: 22 },
   directionsButton: { marginTop: 8 },
 });

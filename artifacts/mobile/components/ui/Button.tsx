@@ -1,15 +1,21 @@
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
+import React, { useCallback } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   ViewStyle,
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+
+export type LucideIcon = React.ComponentType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}>;
 
 interface ButtonProps {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "destructive";
@@ -19,11 +25,11 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
-  icon?: string;
+  icon?: LucideIcon;
   style?: ViewStyle;
 }
 
-export function Button({
+export const Button = React.memo(function Button({
   variant = "primary",
   size = "md",
   title,
@@ -31,12 +37,12 @@ export function Button({
   loading,
   disabled,
   fullWidth,
-  icon,
+  icon: IconComponent,
   style,
 }: ButtonProps) {
   const colors = useColors();
 
-  const getBackgroundColor = () => {
+  const getBackgroundColor = useCallback(() => {
     switch (variant) {
       case "primary":
         return "transparent";
@@ -51,9 +57,9 @@ export function Button({
       default:
         return colors.primary;
     }
-  };
+  }, [variant, colors]);
 
-  const getTextColor = () => {
+  const getTextColor = useCallback(() => {
     if (disabled) return colors.mutedForeground;
     switch (variant) {
       case "primary":
@@ -69,26 +75,30 @@ export function Button({
       default:
         return colors.primaryForeground;
     }
-  };
+  }, [variant, disabled, colors]);
 
   const height = size === "sm" ? 36 : size === "md" ? 48 : 56;
   const paddingHorizontal = size === "sm" ? 12 : 24;
   const fontSize = size === "sm" ? 14 : 16;
   const iconSize = size === "sm" ? 16 : 18;
 
+  const textColor = getTextColor();
+
   const content = (
     <View style={styles.content}>
       {loading ? (
-        <ActivityIndicator color={getTextColor()} size="small" />
+        <ActivityIndicator color={textColor} size="small" />
       ) : (
         <>
-          {icon && (
-            <Text style={[styles.icon, { fontSize: iconSize }]}>{icon}</Text>
+          {IconComponent && (
+            <View style={styles.iconWrap}>
+              <IconComponent size={iconSize} color={textColor} strokeWidth={2} />
+            </View>
           )}
           <Text
             style={[
               styles.text,
-              { color: getTextColor(), fontSize },
+              { color: textColor, fontSize },
               disabled && { color: colors.mutedForeground },
             ]}
           >
@@ -109,17 +119,19 @@ export function Button({
     width: fullWidth ? "100%" : "auto",
     borderWidth: variant === "outline" ? 1 : 0,
     borderColor: variant === "outline" ? colors.primary : "transparent",
-    opacity: disabled ? 0.6 : 1,
     ...style,
   };
 
   if (variant === "primary" && !disabled) {
     return (
-      <TouchableOpacity
+      <Pressable
         onPress={onPress}
         disabled={disabled || loading}
-        activeOpacity={0.8}
-        style={{ width: fullWidth ? "100%" : "auto" }}
+        style={({ pressed }) => ({
+          width: fullWidth ? "100%" : "auto",
+          transform: [{ scale: pressed ? 0.96 : 1 }],
+          opacity: pressed ? 0.88 : 1,
+        })}
       >
         <LinearGradient
           colors={[colors.primary, "#3B6BF5"]}
@@ -129,21 +141,26 @@ export function Button({
         >
           {content}
         </LinearGradient>
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.7}
-      style={containerStyle}
+      style={({ pressed }) => [
+        containerStyle,
+        {
+          transform: [{ scale: pressed && !disabled ? 0.96 : 1 }],
+          opacity: disabled ? 0.6 : pressed ? 0.85 : 1,
+        },
+      ]}
     >
       {content}
-    </TouchableOpacity>
+    </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {
@@ -154,7 +171,7 @@ const styles = StyleSheet.create({
   text: {
     fontWeight: "600",
   },
-  icon: {
+  iconWrap: {
     marginRight: 8,
   },
 });

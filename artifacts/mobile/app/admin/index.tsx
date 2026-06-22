@@ -2,6 +2,17 @@ import { getGetParkingStatsQueryOptions, getGetUserStatsQueryOptions } from "@wo
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import {
+  Bell,
+  Car,
+  CheckCircle,
+  ChevronRight,
+  Leaf,
+  LayoutDashboard,
+  Megaphone,
+  SquareParking,
+  Users,
+} from "lucide-react-native";
 import React from "react";
 import {
   ScrollView,
@@ -16,6 +27,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
+type LucideIcon = React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+
+interface StatCard {
+  label: string;
+  value: number;
+  Icon: LucideIcon;
+  color: string;
+  bg: string;
+  route: string;
+}
+
+interface ActionItem {
+  Icon: LucideIcon;
+  color: string;
+  bg: string;
+  title: string;
+  subtitle: string;
+  route: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const colors = useColors();
@@ -26,11 +57,11 @@ export default function AdminDashboard() {
 
   if (userLoading || parkingLoading) return <LoadingScreen />;
 
-  const statCards = [
+  const statCards: StatCard[] = [
     {
       label: "Total Users",
       value: userStats?.total || 0,
-      emoji: "👥",
+      Icon: Users,
       color: "#3B82F6",
       bg: "#EFF6FF",
       route: "/admin/users",
@@ -38,7 +69,7 @@ export default function AdminDashboard() {
     {
       label: "Active Users",
       value: userStats?.active || 0,
-      emoji: "✅",
+      Icon: CheckCircle,
       color: "#10B981",
       bg: "#ECFDF5",
       route: "/admin/users",
@@ -46,7 +77,7 @@ export default function AdminDashboard() {
     {
       label: "Parking Lots",
       value: parkingStats?.total || 0,
-      emoji: "🚗",
+      Icon: Car,
       color: "#F59E0B",
       bg: "#FFFBEB",
       route: "/admin/parking",
@@ -54,16 +85,16 @@ export default function AdminDashboard() {
     {
       label: "Free Lots",
       value: parkingStats?.free || 0,
-      emoji: "🌿",
+      Icon: Leaf,
       color: "#22C55E",
       bg: "#F0FDF4",
       route: "/admin/parking",
     },
   ];
 
-  const actions = [
+  const actions: ActionItem[] = [
     {
-      emoji: "👥",
+      Icon: Users,
       color: "#3B82F6",
       bg: "#EFF6FF",
       title: "Manage Users",
@@ -71,7 +102,7 @@ export default function AdminDashboard() {
       route: "/admin/users",
     },
     {
-      emoji: "🅿️",
+      Icon: SquareParking,
       color: "#F59E0B",
       bg: "#FFFBEB",
       title: "Manage Parking Lots",
@@ -79,7 +110,7 @@ export default function AdminDashboard() {
       route: "/admin/parking",
     },
     {
-      emoji: "📢",
+      Icon: Megaphone,
       color: "#8B5CF6",
       bg: "#F5F3FF",
       title: "Send Notification",
@@ -94,7 +125,6 @@ export default function AdminDashboard() {
       contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header banner */}
       <LinearGradient
         colors={["#0E4BF1", "#3B6BF5"]}
         start={{ x: 0, y: 0 }}
@@ -107,7 +137,6 @@ export default function AdminDashboard() {
         <Text style={styles.headerSub}>Here's what's happening with ParkEase today.</Text>
       </LinearGradient>
 
-      {/* Stat cards grid */}
       <View style={styles.gridWrapper}>
         <View style={styles.grid}>
           {statCards.map((stat, i) => (
@@ -119,18 +148,17 @@ export default function AdminDashboard() {
             >
               <View style={[styles.statCard, { backgroundColor: stat.bg, borderColor: stat.color + "30" }]}>
                 <View style={[styles.statIconBg, { backgroundColor: stat.color + "20" }]}>
-                  <Text style={styles.statEmoji}>{stat.emoji}</Text>
+                  <stat.Icon size={22} color={stat.color} strokeWidth={2} />
                 </View>
                 <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
                 <Text style={[styles.statLabel, { color: colors.foreground }]}>{stat.label}</Text>
-                <Text style={[styles.statArrow, { color: stat.color }]}>→</Text>
+                <ChevronRight size={16} color={stat.color} strokeWidth={2.5} style={{ marginTop: 4 }} />
               </View>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Quick Actions */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
         <View style={styles.actionList}>
@@ -142,14 +170,14 @@ export default function AdminDashboard() {
             >
               <View style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={[styles.actionIconBg, { backgroundColor: action.bg }]}>
-                  <Text style={styles.actionEmoji}>{action.emoji}</Text>
+                  <action.Icon size={24} color={action.color} strokeWidth={2} />
                 </View>
                 <View style={styles.actionText}>
                   <Text style={[styles.actionTitle, { color: colors.foreground }]}>{action.title}</Text>
                   <Text style={[styles.actionSub, { color: colors.mutedForeground }]}>{action.subtitle}</Text>
                 </View>
                 <View style={[styles.chevronBg, { backgroundColor: action.color + "15" }]}>
-                  <Text style={[styles.chevron, { color: action.color }]}>›</Text>
+                  <ChevronRight size={18} color={action.color} strokeWidth={2.5} />
                 </View>
               </View>
             </TouchableOpacity>
@@ -215,7 +243,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 8,
   },
-  statEmoji: { fontSize: 22 },
   statValue: {
     fontSize: 28,
     fontWeight: "800",
@@ -225,11 +252,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 18,
-  },
-  statArrow: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: 4,
   },
   section: {
     paddingHorizontal: 16,
@@ -256,7 +278,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  actionEmoji: { fontSize: 24 },
   actionText: { flex: 1 },
   actionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
   actionSub: { fontSize: 12, lineHeight: 16 },
@@ -267,5 +288,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  chevron: { fontSize: 20, fontWeight: "700" },
 });

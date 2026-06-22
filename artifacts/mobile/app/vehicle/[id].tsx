@@ -9,11 +9,13 @@ import { useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Camera, ChevronLeft, MapPin, Pencil, Trash2, X } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Alert,
   FlatList,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -183,15 +185,24 @@ export default function VehicleDetails() {
               <Text style={styles.carEmoji}>🚗</Text>
             </View>
           )}
-          <TouchableOpacity
-            style={[styles.backButton, { top: insets.top + 10 }]}
+          <Pressable
+            style={({ pressed }) => [
+              styles.backButton,
+              { top: insets.top + 10, opacity: pressed ? 0.8 : 1 },
+            ]}
             onPress={() => router.back()}
           >
-            <Text style={styles.backEmoji}>←</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cameraIcon} onPress={changePhoto}>
-            <Text style={styles.cameraEmoji}>📷</Text>
-          </TouchableOpacity>
+            <ChevronLeft size={24} color="white" strokeWidth={2.5} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.cameraIcon,
+              { opacity: pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+            ]}
+            onPress={changePhoto}
+          >
+            <Camera size={20} color="white" strokeWidth={2} />
+          </Pressable>
         </View>
 
         <View style={styles.content}>
@@ -201,9 +212,18 @@ export default function VehicleDetails() {
                 <Text style={[styles.name, { color: colors.foreground }]}>{vehicle.name}</Text>
                 <Text style={[styles.plate, { color: colors.primary }]}>{vehicle.licensePlate}</Text>
               </View>
-              <TouchableOpacity onPress={() => setIsEditing(!isEditing)}>
-                <Text style={[styles.editEmoji, { color: colors.primary }]}>{isEditing ? "✕" : "✏️"}</Text>
-              </TouchableOpacity>
+              <Pressable
+                onPress={() => setIsEditing(!isEditing)}
+                style={({ pressed }) => [
+                  styles.editButton,
+                  { backgroundColor: colors.primary + "15", opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                {isEditing
+                  ? <X size={18} color={colors.primary} strokeWidth={2.5} />
+                  : <Pencil size={18} color={colors.primary} strokeWidth={2} />
+                }
+              </Pressable>
             </View>
 
             {isEditing ? (
@@ -243,7 +263,7 @@ export default function VehicleDetails() {
             variant="secondary"
             title="Update Current Location"
             onPress={updateLocation}
-            icon="📍"
+            icon={MapPin}
             fullWidth
             style={styles.locationButton}
             loading={updateLocationMutation.isPending}
@@ -270,7 +290,7 @@ export default function VehicleDetails() {
             variant="destructive"
             title="Delete Vehicle"
             onPress={handleDelete}
-            icon="🗑️"
+            icon={Trash2}
             fullWidth
             style={styles.deleteButton}
           />
@@ -294,17 +314,6 @@ const styles = StyleSheet.create({
   },
   carEmoji: {
     fontSize: 56,
-  },
-  backEmoji: {
-    fontSize: 22,
-    color: "white",
-    fontWeight: "600",
-  },
-  cameraEmoji: {
-    fontSize: 18,
-  },
-  editEmoji: {
-    fontSize: 22,
   },
   photoPlaceholder: {
     flex: 1,
@@ -354,6 +363,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textTransform: "uppercase",
+  },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   detailsGrid: {
     flexDirection: "row",

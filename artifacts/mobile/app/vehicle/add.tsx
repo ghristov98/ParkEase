@@ -1,14 +1,15 @@
 import { useCreateVehicle } from "@workspace/api-client-react";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { Camera, ChevronLeft } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Alert,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -95,24 +96,36 @@ export default function AddVehicleScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backEmoji, { color: colors.foreground }]}>←</Text>
-        </TouchableOpacity>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [
+            styles.backButton,
+            { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+          ]}
+        >
+          <ChevronLeft size={28} color={colors.foreground} strokeWidth={2} />
+        </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>Add Vehicle</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}>
-        <TouchableOpacity onPress={pickImage} style={styles.photoPicker}>
+        <Pressable
+          onPress={pickImage}
+          style={({ pressed }) => [
+            styles.photoPicker,
+            { opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
           {photoUri ? (
             <Image source={{ uri: photoUri }} style={styles.photo} />
           ) : (
             <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Text style={styles.cameraEmoji}>📷</Text>
+              <Camera size={36} color={colors.mutedForeground} strokeWidth={1.5} />
               <Text style={[styles.photoText, { color: colors.mutedForeground }]}>Add Vehicle Photo</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </Pressable>
 
         <View style={styles.form}>
           <Input
@@ -222,13 +235,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-  },
-  backEmoji: {
-    fontSize: 22,
-    fontWeight: "600",
-  },
-  cameraEmoji: {
-    fontSize: 36,
   },
   photoText: {
     fontSize: 14,

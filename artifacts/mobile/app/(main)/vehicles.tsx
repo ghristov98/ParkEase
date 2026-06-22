@@ -1,10 +1,12 @@
 import { getGetVehiclesQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { Car, ChevronRight, MapPin, Plus, PlusCircle } from "lucide-react-native";
 import React from "react";
 import {
   FlatList,
   Image,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -47,7 +49,7 @@ export default function VehiclesScreen() {
                   {item.photoUrl ? (
                     <Image source={{ uri: item.photoUrl }} style={styles.photo} />
                   ) : (
-                    <Text style={styles.vehicleEmoji}>🚘</Text>
+                    <Car size={28} color={colors.mutedForeground} strokeWidth={1.5} />
                   )}
                 </View>
                 <View style={styles.details}>
@@ -58,11 +60,12 @@ export default function VehiclesScreen() {
                   </Text>
                   {(item as any).latitude != null && (
                     <View style={[styles.locationBadge, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" }]}>
-                      <Text style={[styles.locationBadgeText, { color: colors.primary }]}>📍 Location pinned</Text>
+                      <MapPin size={10} color={colors.primary} strokeWidth={2} />
+                      <Text style={[styles.locationBadgeText, { color: colors.primary }]}>Location pinned</Text>
                     </View>
                   )}
                 </View>
-                <Text style={styles.chevronEmoji}>›</Text>
+                <ChevronRight size={20} color={colors.mutedForeground} strokeWidth={2} />
               </View>
             </Card>
           </TouchableOpacity>
@@ -70,28 +73,44 @@ export default function VehiclesScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
-              <Text style={styles.emptyEmoji}>🚘</Text>
+              <Car size={44} color={colors.mutedForeground} strokeWidth={1.5} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No vehicles added</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
               Add your first vehicle to start tracking and managing it.
             </Text>
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
+            <Pressable
+              style={({ pressed }) => [
+                styles.addButton,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: pressed ? 0.88 : 1,
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
+                },
+              ]}
               onPress={() => router.push("/vehicle/add")}
             >
+              <Plus size={18} color="white" strokeWidth={2.5} />
               <Text style={styles.addButtonText}>Add Vehicle</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         }
       />
 
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary, bottom: 100 + insets.bottom }]}
+      <Pressable
+        style={({ pressed }) => [
+          styles.fab,
+          {
+            backgroundColor: colors.primary,
+            bottom: 100 + insets.bottom,
+            opacity: pressed ? 0.88 : 1,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          },
+        ]}
         onPress={() => router.push("/vehicle/add")}
       >
-        <Text style={styles.fabEmoji}>➕</Text>
-      </TouchableOpacity>
+        <PlusCircle size={28} color="white" strokeWidth={2} />
+      </Pressable>
     </View>
   );
 }
@@ -173,16 +192,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 24,
   },
-  vehicleEmoji: {
-    fontSize: 28,
-  },
-  emptyEmoji: {
-    fontSize: 44,
-  },
-  chevronEmoji: {
-    fontSize: 24,
-    color: "#6B7399",
-  },
   locationBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -192,20 +201,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignSelf: "flex-start",
     marginTop: 4,
+    gap: 4,
   },
   locationBadgeText: {
     fontSize: 11,
     fontWeight: "600",
   },
-  fabEmoji: {
-    fontSize: 22,
-  },
   addButton: {
-    paddingHorizontal: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 28,
     height: 48,
     borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: 8,
   },
   addButtonText: {
     color: "white",

@@ -1,12 +1,13 @@
 import { useRouter } from "expo-router";
+import { AlertCircle, CheckCircle, ChevronLeft, Mail } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -48,9 +49,15 @@ export default function ForgotPasswordScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
     >
       <View style={[styles.headerActions, { top: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backEmoji, { color: colors.foreground }]}>←</Text>
-        </TouchableOpacity>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [
+            styles.backButton,
+            { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+          ]}
+        >
+          <ChevronLeft size={28} color={colors.foreground} strokeWidth={2} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -65,7 +72,7 @@ export default function ForgotPasswordScreen() {
         {isSuccess ? (
           <View style={styles.successContainer}>
             <View style={[styles.successBadge, { backgroundColor: "#DCFCE7" }]}>
-              <Text style={styles.checkEmoji}>✅</Text>
+              <CheckCircle size={52} color="#22C55E" strokeWidth={1.5} />
             </View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Instructions Sent!</Text>
             <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
@@ -88,7 +95,7 @@ export default function ForgotPasswordScreen() {
 
             {error && (
               <View style={[styles.errorBanner, { backgroundColor: colors.destructive + "10" }]}>
-                <Text style={styles.alertEmoji}>⚠️</Text>
+                <AlertCircle size={18} color={colors.destructive} strokeWidth={2} />
                 <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
               </View>
             )}
@@ -100,7 +107,7 @@ export default function ForgotPasswordScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              leftIconText="✉️"
+              leftIcon={Mail}
             />
 
             <Button
@@ -122,16 +129,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     zIndex: 10,
-  },
-  backEmoji: {
-    fontSize: 22,
-    fontWeight: "600",
-  },
-  checkEmoji: {
-    fontSize: 48,
-  },
-  alertEmoji: {
-    fontSize: 18,
   },
   backButton: {
     width: 40,

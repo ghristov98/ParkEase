@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
+import { PlayCircle, Plus, Search, Settings, SlidersHorizontal, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -16,6 +17,7 @@ import {
   Image,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -542,7 +544,7 @@ export default function MapScreen() {
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.webHeader}>
           <Text style={[styles.webTitle, { color: colors.foreground }]}>Parking Lots</Text>
-          <Input placeholder="Search parking lots..." value={search} onChangeText={setSearch} leftIconText="🔍" />
+          <Input placeholder="Search parking lots..." value={search} onChangeText={setSearch} leftIcon={Search} />
         </View>
         <FlatList
           data={parkingLots}
@@ -637,14 +639,25 @@ export default function MapScreen() {
       {/* Floating search + city selector */}
       <View style={[styles.floatingSearch, { top: insets.top + 10 }]}>
         <View style={styles.searchRow}>
-          <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIconText="🔍" style={[styles.searchInput, { flex: 1 }]} />
-          <TouchableOpacity
-            style={[styles.filterBtn, { backgroundColor: colors.card }]}
+          <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIcon={Search} style={[styles.searchInput, { flex: 1 }]} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.filterBtn,
+              {
+                backgroundColor: filterOpen ? colors.primary + "18" : colors.card,
+                borderColor: filterOpen ? colors.primary : colors.border,
+                opacity: pressed ? 0.8 : 1,
+                transform: [{ scale: pressed ? 0.95 : 1 }],
+              },
+            ]}
             onPress={() => setFilterOpen((v) => !v)}
-            activeOpacity={0.7}
           >
-            <Text style={styles.filterBtnEmoji}>☰</Text>
-          </TouchableOpacity>
+            <SlidersHorizontal
+              size={20}
+              color={filterOpen ? colors.primary : colors.mutedForeground}
+              strokeWidth={2}
+            />
+          </Pressable>
         </View>
 
         {/* City selector segmented control */}
@@ -727,9 +740,13 @@ export default function MapScreen() {
       {nearbyMachinesCoord && (
         <View style={[styles.nearbyMachinesBanner, { bottom: 100 + insets.bottom }]}>
           <Text style={styles.nearbyMachinesText}>💲 Showing nearby machines</Text>
-          <TouchableOpacity onPress={() => setNearbyMachinesCoord(null)} style={styles.nearbyMachinesClear}>
-            <Text style={styles.nearbyMachinesClearText}>✕ Clear</Text>
-          </TouchableOpacity>
+          <Pressable
+            onPress={() => setNearbyMachinesCoord(null)}
+            style={({ pressed }) => [styles.nearbyMachinesClear, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <X size={14} color={colors.mutedForeground} strokeWidth={2.5} />
+            <Text style={styles.nearbyMachinesClearText}>Clear</Text>
+          </Pressable>
         </View>
       )}
 
@@ -768,9 +785,12 @@ export default function MapScreen() {
       {selectedLot && !longPressCoord && !selectedPenalty && (
         <View style={[styles.bottomSheet, { bottom: 100 + insets.bottom }]}>
           <Card padding={false}>
-            <TouchableOpacity onPress={() => setSelectedLot(null)} style={styles.closeButton}>
-              <Text style={[styles.closeEmoji, { color: colors.mutedForeground }]}>✕</Text>
-            </TouchableOpacity>
+            <Pressable
+              onPress={() => setSelectedLot(null)}
+              style={({ pressed }) => [styles.closeButton, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <X size={20} color={colors.mutedForeground} strokeWidth={2.5} />
+            </Pressable>
             <View style={{ padding: 16 }}>
               <View style={styles.lotHeader}>
                 <Text style={[styles.lotName, { color: colors.foreground }]}>{selectedLot.name}</Text>
@@ -787,9 +807,43 @@ export default function MapScreen() {
       )}
 
       {isSuperAdmin && (
-        <TouchableOpacity style={[styles.adminFab, { bottom: 100 + insets.bottom, backgroundColor: colors.primary }]} onPress={() => router.push("/admin")}>
-          <Text style={styles.fabEmoji}>⚙️</Text>
-        </TouchableOpacity>
+        <Pressable
+          style={({ pressed }) => [
+            styles.adminFab,
+            {
+              bottom: 100 + insets.bottom,
+              backgroundColor: colors.primary,
+              opacity: pressed ? 0.88 : 1,
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+            },
+          ]}
+          onPress={() => router.push("/admin")}
+        >
+          <Settings size={24} color="white" strokeWidth={2} />
+        </Pressable>
+      )}
+
+      {!isSuperAdmin && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.sessionFab,
+            {
+              bottom: 100 + insets.bottom,
+              backgroundColor: colors.primary,
+              opacity: pressed ? 0.88 : 1,
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+            },
+          ]}
+          onPress={() => {
+            if (selectedLot) {
+              router.push(`/parking/${selectedLot.id}`);
+            } else {
+              Alert.alert("Select a Lot", "Tap a parking lot on the map to start a session.");
+            }
+          }}
+        >
+          <PlayCircle size={26} color="white" strokeWidth={2} />
+        </Pressable>
       )}
 
       {/* Penalty marker info modal */}
@@ -807,9 +861,12 @@ export default function MapScreen() {
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={() => setSelectedPenalty(null)}>
-              <Text style={[styles.closeEmoji, { color: colors.mutedForeground }]}>✕</Text>
-            </TouchableOpacity>
+            <Pressable
+              onPress={() => setSelectedPenalty(null)}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <X size={20} color={colors.mutedForeground} strokeWidth={2.5} />
+            </Pressable>
           </View>
 
           <View style={styles.section}>
@@ -865,9 +922,12 @@ export default function MapScreen() {
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={() => setLongPressCoord(null)}>
-              <Text style={[styles.closeEmoji, { color: colors.mutedForeground }]}>✕</Text>
-            </TouchableOpacity>
+            <Pressable
+              onPress={() => setLongPressCoord(null)}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <X size={20} color={colors.mutedForeground} strokeWidth={2.5} />
+            </Pressable>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 520 }}>
@@ -927,15 +987,15 @@ export default function MapScreen() {
                     {addForm.mainPhotoIndex === i && (
                       <View style={styles.mainBadge}><Text style={styles.mainBadgeText}>MAIN</Text></View>
                     )}
-                    <TouchableOpacity
-                      style={styles.photoRemoveBtn}
+                    <Pressable
+                      style={({ pressed }) => [styles.photoRemoveBtn, { opacity: pressed ? 0.7 : 1 }]}
                       onPress={() => setAddForm((f) => {
                         const photos = f.photos.filter((_, j) => j !== i);
                         return { ...f, photos, mainPhotoIndex: Math.min(f.mainPhotoIndex, Math.max(0, photos.length - 1)) };
                       })}
                     >
-                      <Text style={styles.photoRemoveText}>✕</Text>
-                    </TouchableOpacity>
+                      <X size={12} color="white" strokeWidth={3} />
+                    </Pressable>
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity style={[styles.addPhotoBtn, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={pickPhotos}>
@@ -1099,7 +1159,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  filterBtnEmoji: { fontSize: 22 },
   floatingSearch: { position: "absolute", left: 16, right: 16, zIndex: 10 },
   searchInput: { backgroundColor: "white", height: 50 },
   citySelector: {
@@ -1242,10 +1301,14 @@ const styles = StyleSheet.create({
   lotAddress: { fontSize: 14, marginBottom: 16 },
   detailsButton: { flexDirection: "row", height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", gap: 8 },
   detailsButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
-  closeEmoji: { fontSize: 18, fontWeight: "600" },
   arrowEmoji: { fontSize: 16, color: "white", fontWeight: "600" },
-  fabEmoji: { fontSize: 22 },
   adminFab: {
+    position: "absolute", right: 16, width: 56, height: 56, borderRadius: 28,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65,
+    elevation: 8, zIndex: 10,
+  },
+  sessionFab: {
     position: "absolute", right: 16, width: 56, height: 56, borderRadius: 28,
     alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65,
@@ -1284,7 +1347,6 @@ const styles = StyleSheet.create({
     position: "absolute", top: -6, right: -6, width: 20, height: 20,
     borderRadius: 10, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center",
   },
-  photoRemoveText: { color: "white", fontSize: 10, fontWeight: "700" },
   addPhotoBtn: {
     width: 80, height: 80, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed",
     alignItems: "center", justifyContent: "center", gap: 4,
@@ -1347,8 +1409,11 @@ const styles = StyleSheet.create({
   carMarkerEmoji: { fontSize: 18 },
   nearbyMachinesText: { fontSize: 13, fontWeight: "600", color: "#E65100" },
   nearbyMachinesClear: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     backgroundColor: "#FF9800",
     borderRadius: 8,
   },

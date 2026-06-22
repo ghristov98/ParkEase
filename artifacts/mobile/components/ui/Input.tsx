@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react-native";
+import React, { useCallback, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -11,22 +11,28 @@ import {
 
 import { useColors } from "@/hooks/useColors";
 
+type LucideIcon = React.ComponentType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}>;
+
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
-  leftIcon?: keyof typeof Ionicons.glyphMap;
+  leftIcon?: LucideIcon;
   leftIconText?: string;
-  rightIcon?: keyof typeof Ionicons.glyphMap;
+  rightIcon?: LucideIcon;
   onRightIconPress?: () => void;
   secureTextEntry?: boolean;
 }
 
-export function Input({
+export const Input = React.memo(function Input({
   label,
   error,
-  leftIcon,
+  leftIcon: LeftIconComponent,
   leftIconText,
-  rightIcon,
+  rightIcon: RightIconComponent,
   onRightIconPress,
   secureTextEntry,
   style,
@@ -39,62 +45,91 @@ export function Input({
   const isPassword = secureTextEntry;
   const actualSecureTextEntry = isPassword && !showPassword;
 
+  const iconColor = isFocused ? colors.primary : colors.mutedForeground;
+
+  const handleFocus = useCallback(() => setIsFocused(true), []);
+  const handleBlur = useCallback(() => setIsFocused(false), []);
+  const handleTogglePassword = useCallback(() => setShowPassword((v) => !v), []);
+
   return (
     <View style={styles.container}>
-      {label && <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>}
+      {label && (
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>
+      )}
       <View
         style={[
           styles.inputContainer,
           {
             backgroundColor: colors.card,
-            borderColor: error ? colors.destructive : isFocused ? colors.primary : colors.border,
+            borderColor: error
+              ? colors.destructive
+              : isFocused
+              ? colors.primary
+              : colors.border,
           },
-          props.multiline && { height: undefined, minHeight: 52, alignItems: "flex-start", paddingVertical: 10 },
+          props.multiline && {
+            height: undefined,
+            minHeight: 52,
+            alignItems: "flex-start",
+            paddingVertical: 10,
+          },
         ]}
       >
-        {leftIconText ? (
+        {LeftIconComponent ? (
+          <View style={styles.leftIcon}>
+            <LeftIconComponent size={20} color={iconColor} strokeWidth={2} />
+          </View>
+        ) : leftIconText ? (
           <Text style={styles.leftIconText}>{leftIconText}</Text>
-        ) : leftIcon ? (
-          <Ionicons
-            name={leftIcon}
-            size={20}
-            color={isFocused ? colors.primary : colors.mutedForeground}
-            style={styles.leftIcon}
-          />
         ) : null}
+
         <TextInput
           style={[
             styles.input,
             { color: colors.foreground },
-            props.multiline && { height: undefined, minHeight: 80, textAlignVertical: "top" },
+            props.multiline && {
+              height: undefined,
+              minHeight: 80,
+              textAlignVertical: "top",
+            },
             style,
           ]}
           scrollEnabled={props.multiline}
           placeholderTextColor={colors.mutedForeground}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           secureTextEntry={actualSecureTextEntry}
           {...props}
         />
+
         {isPassword ? (
           <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
+            onPress={handleTogglePassword}
             style={styles.rightIcon}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.leftIconText}>
-              {showPassword ? "🙈" : "👁️"}
-            </Text>
+            {showPassword ? (
+              <EyeOff size={20} color={colors.mutedForeground} strokeWidth={2} />
+            ) : (
+              <Eye size={20} color={colors.mutedForeground} strokeWidth={2} />
+            )}
           </TouchableOpacity>
-        ) : rightIcon ? (
-          <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon}>
-            <Ionicons name={rightIcon} size={20} color={colors.mutedForeground} />
+        ) : RightIconComponent ? (
+          <TouchableOpacity
+            onPress={onRightIconPress}
+            style={styles.rightIcon}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <RightIconComponent size={20} color={colors.mutedForeground} strokeWidth={2} />
           </TouchableOpacity>
         ) : null}
       </View>
-      {error && <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>}
+      {error && (
+        <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>
+      )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

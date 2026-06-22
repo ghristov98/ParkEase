@@ -55,6 +55,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "lucide-react-native": "^1.21.0",
     "react-native-maps": "1.18.0"
   }
 }
