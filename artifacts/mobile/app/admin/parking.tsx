@@ -5,6 +5,7 @@ import {
   getGetParkingLotsQueryOptions,
 } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
+import { Plus } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Alert,
@@ -111,7 +112,7 @@ export default function AdminParking() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Button title="Add Parking Lot" onPress={handleOpenAdd} icon="➕" fullWidth />
+        <Button title="Add Parking Lot" onPress={handleOpenAdd} icon={Plus} fullWidth />
       </View>
 
       <FlatList

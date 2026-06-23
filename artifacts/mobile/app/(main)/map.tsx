@@ -8,14 +8,34 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { PlayCircle, Plus, Search, Settings, SlidersHorizontal, X } from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Car,
+  Heart,
+  MapPin,
+  Minus,
+  Navigation,
+  PlayCircle,
+  Plus,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  X,
+} from "lucide-react-native";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Animated,
   FlatList,
   Image,
+  Linking,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -27,8 +47,21 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MapView, Marker, Polygon } from "@/components/NativeMap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { checkZone, getZonePolygons, getParkingMachines, getMapCenter, ZoneResult, ZonePolygon } from "@/services/ZoneService";
+import {
+  checkZone,
+  getZonePolygons,
+  getParkingMachines,
+  getMapCenter,
+  ZoneResult,
+  ZonePolygon,
+} from "@/services/ZoneService";
 import LocationWatcher from "@/services/LocationWatcher";
+import Svg, {
+  Polygon as SvgPolygon,
+  Rect,
+  Text as SvgText,
+  Circle,
+} from "react-native-svg";
 
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -36,10 +69,8 @@ import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-const PARKING_PIN = require("@/assets/images/image.png");
-
 // ---------------------------------------------------------------------------
-// City config — easy to extend with more cities
+// City config
 // ---------------------------------------------------------------------------
 
 interface CityConfig {
@@ -95,47 +126,30 @@ interface PenaltyMarker {
 }
 
 const PENALTY_STORAGE_KEY = "parkease_penalty_markers";
+const FAVOURITES_KEY = "parkease_favourites";
 
 // ---------------------------------------------------------------------------
-// Memoized marker components
+// Sheet item union type
 // ---------------------------------------------------------------------------
 
-const ParkingLotMarker = React.memo(({ lot, onPress }: any) => (
-  <Marker
-    coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
-    onPress={onPress}
-    anchor={{ x: 0.5, y: 1 }}
-  >
-    <Image source={PARKING_PIN} style={styles.parkingPinImage} resizeMode="contain" />
-  </Marker>
-));
-
-const MachineMarker = React.memo(({ lat, lng }: { lat: number; lng: number }) => (
-  <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 1 }}>
-    <View style={styles.machineMarker}>
-      <Text style={styles.machineEmoji}>💲</Text>
-    </View>
-  </Marker>
-));
-
-const PenaltyMarkerComponent = React.memo(({ marker, onPress }: { marker: PenaltyMarker; onPress: () => void }) => (
-  <Marker coordinate={{ latitude: marker.latitude, longitude: marker.longitude }} onPress={onPress}>
-    <View style={styles.penaltyMarkerView}>
-      <Text style={styles.penaltyEmoji}>⚠️</Text>
-    </View>
-  </Marker>
-));
+type SheetItem =
+  | { type: "lot"; data: any }
+  | {
+      type: "zone";
+      data: {
+        zone: ZonePolygon;
+        zoneInfo: ZoneResult;
+        coord: { latitude: number; longitude: number };
+      };
+    };
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const MAP_CENTER = getMapCenter();
-
 const NEARBY_THRESHOLD_M = 300;
-
 const BASE_URL = "https://" + (process.env.EXPO_PUBLIC_DOMAIN ?? "");
-
 const AMENITIES = [
   { key: "hasSecurityGuard", label: "Security Guard", emoji: "💂" },
   { key: "hasCCTV", label: "CCTV Cameras", emoji: "📷" },
@@ -144,8 +158,7 @@ const AMENITIES = [
   { key: "hasEVCharging", label: "EV Charging", emoji: "⚡" },
   { key: "hasDisabledAccess", label: "Disabled Access", emoji: "♿" },
 ] as const;
-
-type AmenityKey = typeof AMENITIES[number]["key"];
+type AmenityKey = (typeof AMENITIES)[number]["key"];
 
 interface AddForm {
   name: string;
@@ -174,30 +187,190 @@ const DEFAULT_FORM: AddForm = {
   mainPhotoIndex: 0,
 };
 
-function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+function getDistanceMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistance(meters: number): string {
+  return meters < 1000
+    ? `${Math.round(meters)}m away`
+    : `${(meters / 1000).toFixed(1)}km away`;
 }
 
 const ZONE_POLYGONS = getZonePolygons();
 const PARKING_MACHINES = getParkingMachines();
 
-// Find the closest named city (excludes "full") to a GPS position
 function detectCity(lat: number, lng: number): CityConfig {
   const named = CITIES.filter((c) => c.id !== "full");
   let best = named[0];
   let bestDist = Infinity;
   for (const city of named) {
-    const d = getDistanceMeters(lat, lng, city.center.latitude, city.center.longitude);
-    if (d < bestDist) { bestDist = d; best = city; }
+    const d = getDistanceMeters(
+      lat,
+      lng,
+      city.center.latitude,
+      city.center.longitude
+    );
+    if (d < bestDist) {
+      bestDist = d;
+      best = city;
+    }
   }
   return best;
 }
+
+// ---------------------------------------------------------------------------
+// SVG Marker components — crisp at all zoom levels
+// ---------------------------------------------------------------------------
+
+const ParkingLotSvgMarker = React.memo(
+  ({ type }: { type: "free" | "paid" }) => {
+    const color = type === "free" ? "#22C55E" : "#F97316";
+    return (
+      <Svg width={38} height={45} viewBox="0 0 38 45">
+        <Rect
+          x={2}
+          y={2}
+          width={34}
+          height={34}
+          rx={7}
+          ry={7}
+          fill="white"
+          stroke={color}
+          strokeWidth={2.5}
+        />
+        <SvgText
+          x={19}
+          y={25}
+          textAnchor="middle"
+          fontSize={19}
+          fontWeight="bold"
+          fill={color}
+        >
+          P
+        </SvgText>
+        {/* Downward pointer */}
+        <SvgPolygon points="14,34 24,34 19,44" fill={color} />
+      </Svg>
+    );
+  }
+);
+
+const PenaltyMarkerSvg = React.memo(() => (
+  <Svg width={40} height={38} viewBox="0 0 40 38">
+    <SvgPolygon
+      points="20,2 38,36 2,36"
+      fill="#EF4444"
+      stroke="white"
+      strokeWidth={2}
+      strokeLinejoin="round"
+    />
+    <SvgText
+      x={20}
+      y={30}
+      textAnchor="middle"
+      fontSize={16}
+      fill="white"
+      fontWeight="bold"
+    >
+      ⚠
+    </SvgText>
+  </Svg>
+));
+
+const VehicleSvgMarker = React.memo(({ primaryColor }: { primaryColor: string }) => (
+  <Svg width={44} height={44} viewBox="0 0 44 44">
+    <Circle cx={22} cy={22} r={20} fill="white" stroke={primaryColor} strokeWidth={2.5} />
+    <SvgPolygon
+      points="10,27 10,22 13,16 31,16 34,22 34,27"
+      fill={primaryColor}
+      stroke={primaryColor}
+      strokeWidth={1}
+      strokeLinejoin="round"
+    />
+    {/* Cabin */}
+    <SvgPolygon
+      points="15,16 16,11 28,11 29,16"
+      fill={primaryColor}
+      strokeLinejoin="round"
+    />
+    {/* Left wheel */}
+    <Circle cx={15} cy={27} r={4} fill="white" stroke={primaryColor} strokeWidth={1.5} />
+    {/* Right wheel */}
+    <Circle cx={29} cy={27} r={4} fill="white" stroke={primaryColor} strokeWidth={1.5} />
+  </Svg>
+));
+
+// ---------------------------------------------------------------------------
+// Drop animation wrapper — bounce landing from above
+// ---------------------------------------------------------------------------
+
+const AnimatedDropMarker = React.memo(({ children }: { children: React.ReactNode }) => {
+  const drop = useRef(new Animated.Value(-55)).current;
+  useEffect(() => {
+    Animated.spring(drop, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 55,
+      friction: 6,
+    }).start();
+  }, []);
+  return (
+    <Animated.View style={{ transform: [{ translateY: drop }] }}>
+      {children}
+    </Animated.View>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Memoized map marker components
+// ---------------------------------------------------------------------------
+
+const ParkingLotMarker = React.memo(({ lot, onPress }: any) => (
+  <Marker
+    coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
+    onPress={onPress}
+    anchor={{ x: 0.5, y: 1 }}
+  >
+    <AnimatedDropMarker>
+      <ParkingLotSvgMarker type={lot.type} />
+    </AnimatedDropMarker>
+  </Marker>
+));
+
+const MachineMarker = React.memo(({ lat, lng }: { lat: number; lng: number }) => (
+  <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 1 }}>
+    <View style={styles.machineMarker}>
+      <Text style={styles.machineEmoji}>💲</Text>
+    </View>
+  </Marker>
+));
+
+const PenaltyMarkerComponent = React.memo(
+  ({ marker, onPress }: { marker: PenaltyMarker; onPress: () => void }) => (
+    <Marker
+      coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
+      onPress={onPress}
+    >
+      <AnimatedDropMarker>
+        <PenaltyMarkerSvg />
+      </AnimatedDropMarker>
+    </Marker>
+  )
+);
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -211,7 +384,7 @@ export default function MapScreen() {
     longitudeDelta: 0.05,
   });
   const [search, setSearch] = useState("");
-  const [selectedLot, setSelectedLot] = useState<any>(null);
+  const [sheetItem, setSheetItem] = useState<SheetItem | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
   const [longPressCoord, setLongPressCoord] = useState<{ latitude: number; longitude: number } | null>(null);
   const [addForm, setAddForm] = useState<AddForm>(DEFAULT_FORM);
@@ -219,23 +392,58 @@ export default function MapScreen() {
   const [isRemoving, setIsRemoving] = useState(false);
   const [zoneResult, setZoneResult] = useState<ZoneResult>({ zone: null });
   const bannerAnim = useRef(new Animated.Value(0)).current;
-
-  // City selector
   const [selectedCity, setSelectedCity] = useState("burgas");
-
-  // Filter panel
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterAnim = useRef(new Animated.Value(0)).current;
-
-  // Nearby machines mode — set when user taps a zone and agrees to see machines
   const [nearbyMachinesCoord, setNearbyMachinesCoord] = useState<{ latitude: number; longitude: number } | null>(null);
-
-  // Penalty markers (superadmin)
   const [penaltyMarkers, setPenaltyMarkers] = useState<PenaltyMarker[]>([]);
   const [penaltyMode, setPenaltyMode] = useState(false);
   const [selectedPenalty, setSelectedPenalty] = useState<PenaltyMarker | null>(null);
   const [penaltyNote, setPenaltyNote] = useState("");
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [zonePulse, setZonePulse] = useState(false);
+  const [favouriteIds, setFavouriteIds] = useState<Set<string>>(new Set());
+
+  const mapRef = useRef<any>(null);
+  const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+
+  // Sheet animation state
+  const sheetAnim = useRef(new Animated.Value(1)).current; // 0=open 1=closed
+  const sheetPanY = useRef(new Animated.Value(0)).current;
+  const sheetTranslateY = useRef(
+    Animated.add(
+      sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 420] }),
+      sheetPanY
+    )
+  ).current;
+
+  // Stable ref so PanResponder can always call the latest closeSheet
+  const closeSheetRef = useRef<() => void>(() => {});
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) sheetPanY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.8) {
+          sheetPanY.setValue(0);
+          closeSheetRef.current();
+        } else {
+          Animated.spring(sheetPanY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 12,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const { user, accessToken } = useAuth();
   const colors = useColors();
@@ -249,21 +457,102 @@ export default function MapScreen() {
   const { data: parkingLots } = useQuery(
     getGetParkingLotsQueryOptions({ search: search || undefined })
   );
-
   const { data: userVehicles } = useQuery(getGetVehiclesQueryOptions());
 
-  const vehicleMarkers = useMemo(() =>
-    (userVehicles ?? []).filter((v: any) => v.latitude != null && v.longitude != null),
+  const vehicleMarkers = useMemo(
+    () =>
+      (userVehicles ?? []).filter(
+        (v: any) => v.latitude != null && v.longitude != null
+      ),
     [userVehicles]
   );
 
+  // Derived: selectedLot for backwards-compat with sessionFab logic
+  const selectedLot = sheetItem?.type === "lot" ? sheetItem.data : null;
+
+  // ---------------------------------------------------------------------------
+  // Sheet open / close
+  // ---------------------------------------------------------------------------
+
+  const openSheet = useCallback(
+    (item: SheetItem) => {
+      setSheetItem(item);
+      sheetAnim.setValue(1);
+      Animated.spring(sheetAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start();
+    },
+    [sheetAnim]
+  );
+
+  const closeSheet = useCallback(() => {
+    Animated.timing(sheetAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setSheetItem(null);
+      setSelectedZoneId(null);
+      sheetPanY.setValue(0);
+    });
+  }, [sheetAnim, sheetPanY]);
+
+  // Keep ref current so PanResponder always calls latest closeSheet
+  closeSheetRef.current = closeSheet;
+
+  // ---------------------------------------------------------------------------
+  // Zone pulse animation
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!selectedZoneId) {
+      setZonePulse(false);
+      return;
+    }
+    const timer = setInterval(() => setZonePulse((v) => !v), 650);
+    return () => clearInterval(timer);
+  }, [selectedZoneId]);
+
+  // ---------------------------------------------------------------------------
+  // Favourites
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    AsyncStorage.getItem(FAVOURITES_KEY)
+      .then((val) => {
+        if (val) setFavouriteIds(new Set(JSON.parse(val)));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleFavourite = useCallback((id: string) => {
+    setFavouriteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      AsyncStorage.setItem(FAVOURITES_KEY, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Load penalty markers from storage
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     (async () => {
       try {
         const stored = await AsyncStorage.getItem(PENALTY_STORAGE_KEY);
         if (stored) setPenaltyMarkers(JSON.parse(stored));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     })();
   }, []);
 
@@ -271,10 +560,15 @@ export default function MapScreen() {
     setPenaltyMarkers(markers);
     try {
       await AsyncStorage.setItem(PENALTY_STORAGE_KEY, JSON.stringify(markers));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
+  // ---------------------------------------------------------------------------
   // Filter panel animation
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     Animated.spring(filterAnim, {
       toValue: filterOpen ? 1 : 0,
@@ -284,7 +578,10 @@ export default function MapScreen() {
     }).start();
   }, [filterOpen]);
 
-  // City change — animate map to new region
+  // ---------------------------------------------------------------------------
+  // City change
+  // ---------------------------------------------------------------------------
+
   const handleCityChange = useCallback((cityId: string) => {
     setSelectedCity(cityId);
     const city = CITIES.find((c) => c.id === cityId);
@@ -298,16 +595,25 @@ export default function MapScreen() {
     }
   }, []);
 
-  // Filtered data using useMemo
-  const filteredZones = useMemo(() =>
-    filters.zones ? ZONE_POLYGONS : [],
+  // ---------------------------------------------------------------------------
+  // Filtered data
+  // ---------------------------------------------------------------------------
+
+  const filteredZones = useMemo(
+    () => (filters.zones ? ZONE_POLYGONS : []),
     [filters.zones]
   );
 
   const filteredMachines = useMemo(() => {
     if (nearbyMachinesCoord) {
-      return PARKING_MACHINES.filter((m) =>
-        getDistanceMeters(nearbyMachinesCoord.latitude, nearbyMachinesCoord.longitude, m.lat, m.lng) <= 500
+      return PARKING_MACHINES.filter(
+        (m) =>
+          getDistanceMeters(
+            nearbyMachinesCoord.latitude,
+            nearbyMachinesCoord.longitude,
+            m.lat,
+            m.lng
+          ) <= 500
       );
     }
     return filters.paidParking ? PARKING_MACHINES : [];
@@ -315,22 +621,38 @@ export default function MapScreen() {
 
   const filteredParkingLots = useMemo(() => {
     const lots = (parkingLots ?? []) as any[];
-    const cityFiltered = selectedCity === "full"
-      ? lots
-      : lots.filter((lot: any) => {
-          const city = CITIES.find((c) => c.id === selectedCity);
-          if (!city || lot.latitude == null || lot.longitude == null) return true;
-          return getDistanceMeters(lot.latitude, lot.longitude, city.center.latitude, city.center.longitude) <= 50000;
-        });
+    const cityFiltered =
+      selectedCity === "full"
+        ? lots
+        : lots.filter((lot: any) => {
+            const city = CITIES.find((c) => c.id === selectedCity);
+            if (!city || lot.latitude == null || lot.longitude == null) return true;
+            return (
+              getDistanceMeters(
+                lot.latitude,
+                lot.longitude,
+                city.center.latitude,
+                city.center.longitude
+              ) <= 50000
+            );
+          });
     return cityFiltered.filter((lot: any) =>
-      lot.type === "free" ? filters.freeParking : lot.type === "paid" ? filters.paidParking : true
+      lot.type === "free"
+        ? filters.freeParking
+        : lot.type === "paid"
+        ? filters.paidParking
+        : true
     );
   }, [parkingLots, filters.freeParking, filters.paidParking, selectedCity]);
 
-  const filteredPenaltyMarkers = useMemo(() =>
-    isSuperAdmin && filters.penaltyParking ? penaltyMarkers : [],
+  const filteredPenaltyMarkers = useMemo(
+    () => (isSuperAdmin && filters.penaltyParking ? penaltyMarkers : []),
     [isSuperAdmin, filters.penaltyParking, penaltyMarkers]
   );
+
+  // ---------------------------------------------------------------------------
+  // Location permission + initial position
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     (async () => {
@@ -339,9 +661,11 @@ export default function MapScreen() {
         setLocationPermission(status === "granted");
         if (status === "granted") {
           try {
-            const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const location = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
             const { latitude, longitude } = location.coords;
-            // Auto-select the city the user is currently in
+            userLocationRef.current = { latitude, longitude };
             const nearestCity = detectCity(latitude, longitude);
             setSelectedCity(nearestCity.id);
             setRegion({
@@ -352,9 +676,13 @@ export default function MapScreen() {
             });
             const initial = checkZone(latitude, longitude);
             setZoneResult(initial);
-          } catch { /* keep default */ }
+          } catch {
+            /* keep default */
+          }
         }
-      } catch { /* keep default */ }
+      } catch {
+        /* keep default */
+      }
     })();
   }, []);
 
@@ -379,32 +707,105 @@ export default function MapScreen() {
     }).start();
   }, [zoneResult.zone]);
 
+  // ---------------------------------------------------------------------------
+  // Nearby lot detection (for superadmin long-press)
+  // ---------------------------------------------------------------------------
+
   const nearbyLot = longPressCoord
     ? (parkingLots ?? []).find(
-        (lot: any) => getDistanceMeters(longPressCoord.latitude, longPressCoord.longitude, lot.latitude, lot.longitude) <= NEARBY_THRESHOLD_M
+        (lot: any) =>
+          getDistanceMeters(
+            longPressCoord.latitude,
+            longPressCoord.longitude,
+            lot.latitude,
+            lot.longitude
+          ) <= NEARBY_THRESHOLD_M
       ) ?? null
     : null;
 
-  const handleLongPress = useCallback((e: any) => {
-    if (!isSuperAdmin) return;
-    const coord = e.nativeEvent.coordinate;
+  // ---------------------------------------------------------------------------
+  // Map control handlers
+  // ---------------------------------------------------------------------------
 
-    if (penaltyMode) {
-      const newMarker: PenaltyMarker = {
-        id: `penalty-${Date.now()}`,
-        latitude: coord.latitude,
-        longitude: coord.longitude,
-        timestamp: Date.now(),
-        note: "",
+  const handleZoomIn = useCallback(() => {
+    setRegion((r) => {
+      const newRegion = {
+        ...r,
+        latitudeDelta: Math.max(r.latitudeDelta / 2, 0.001),
+        longitudeDelta: Math.max(r.longitudeDelta / 2, 0.001),
       };
-      savePenaltyMarkers([...penaltyMarkers, newMarker]);
-      return;
-    }
+      mapRef.current?.animateToRegion(newRegion, 300);
+      return newRegion;
+    });
+  }, []);
 
-    setLongPressCoord(coord);
-    setAddForm(DEFAULT_FORM);
-    setSelectedLot(null);
-  }, [isSuperAdmin, penaltyMode, penaltyMarkers, savePenaltyMarkers]);
+  const handleZoomOut = useCallback(() => {
+    setRegion((r) => {
+      const newRegion = {
+        ...r,
+        latitudeDelta: Math.min(r.latitudeDelta * 2, 80),
+        longitudeDelta: Math.min(r.longitudeDelta * 2, 80),
+      };
+      mapRef.current?.animateToRegion(newRegion, 300);
+      return newRegion;
+    });
+  }, []);
+
+  const handleCenterOnUser = useCallback(async () => {
+    if (!locationPermission) return;
+    try {
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const { latitude, longitude } = loc.coords;
+      userLocationRef.current = { latitude, longitude };
+      const newRegion = { latitude, longitude, latitudeDelta: 0.008, longitudeDelta: 0.008 };
+      setRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 800);
+    } catch {
+      /* ignore */
+    }
+  }, [locationPermission]);
+
+  const handleNavigate = useCallback(
+    (latitude: number, longitude: number, name: string) => {
+      const label = encodeURIComponent(name);
+      const url =
+        Platform.OS === "ios"
+          ? `maps:0,0?q=${label}@${latitude},${longitude}`
+          : `geo:${latitude},${longitude}?q=${latitude},${longitude}(${label})`;
+      Linking.openURL(url).catch(() => {
+        Linking.openURL(`https://www.google.com/maps?q=${latitude},${longitude}`);
+      });
+    },
+    []
+  );
+
+  // ---------------------------------------------------------------------------
+  // Long-press & penalty handlers
+  // ---------------------------------------------------------------------------
+
+  const handleLongPress = useCallback(
+    (e: any) => {
+      if (!isSuperAdmin) return;
+      const coord = e.nativeEvent.coordinate;
+      if (penaltyMode) {
+        const newMarker: PenaltyMarker = {
+          id: `penalty-${Date.now()}`,
+          latitude: coord.latitude,
+          longitude: coord.longitude,
+          timestamp: Date.now(),
+          note: "",
+        };
+        savePenaltyMarkers([...penaltyMarkers, newMarker]);
+        return;
+      }
+      setLongPressCoord(coord);
+      setAddForm(DEFAULT_FORM);
+      closeSheet();
+    },
+    [isSuperAdmin, penaltyMode, penaltyMarkers, savePenaltyMarkers, closeSheet]
+  );
 
   const handlePenaltyPress = useCallback((marker: PenaltyMarker) => {
     setSelectedPenalty(marker);
@@ -441,7 +842,11 @@ export default function MapScreen() {
 
   const uploadPhoto = async (lotId: string, uri: string): Promise<string | null> => {
     const formData = new FormData();
-    formData.append("photo", { uri, name: "photo.jpg", type: "image/jpeg" } as any);
+    formData.append("photo", {
+      uri,
+      name: "photo.jpg",
+      type: "image/jpeg",
+    } as any);
     try {
       const resp = await fetch(`${BASE_URL}/api/parking/${lotId}/photos`, {
         method: "POST",
@@ -480,7 +885,10 @@ export default function MapScreen() {
         if (addForm.mainPhotoIndex !== 0) {
           await fetch(`${BASE_URL}/api/parking/${lot.id}`, {
             method: "PUT",
-            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({ mainPhotoIndex: addForm.mainPhotoIndex }),
           });
         }
@@ -497,54 +905,64 @@ export default function MapScreen() {
 
   const handleRemovePark = () => {
     if (!nearbyLot) return;
-    Alert.alert("Remove Parking Lot", `Remove "${nearbyLot.name}" from the map?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove", style: "destructive",
-        onPress: async () => {
-          setIsRemoving(true);
-          try {
-            await deleteMutation.mutateAsync({ id: nearbyLot.id });
-            await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
-            setLongPressCoord(null);
-          } catch (err: any) {
-            Alert.alert("Error", err.message || "Failed to remove");
-          } finally {
-            setIsRemoving(false);
-          }
+    Alert.alert(
+      "Remove Parking Lot",
+      `Remove "${nearbyLot.name}" from the map?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            setIsRemoving(true);
+            try {
+              await deleteMutation.mutateAsync({ id: nearbyLot.id });
+              await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
+              setLongPressCoord(null);
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Failed to remove");
+            } finally {
+              setIsRemoving(false);
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const toggleAmenity = (key: AmenityKey) => {
-    setAddForm((f) => ({ ...f, amenities: { ...f.amenities, [key]: !f.amenities[key] } }));
+    setAddForm((f) => ({
+      ...f,
+      amenities: { ...f.amenities, [key]: !f.amenities[key] },
+    }));
   };
 
   const toggleFilter = (key: keyof FilterState) => {
     setFilters((f) => ({ ...f, [key]: !f[key] }));
   };
 
-  const handleZonePress = useCallback((coord: { latitude: number; longitude: number }) => {
-    Alert.alert(
-      "Parking Machines Nearby",
-      "Would you like to see parking machines near this location?",
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes",
-          onPress: () => setNearbyMachinesCoord(coord),
-        },
-      ]
-    );
-  }, []);
+  // ---------------------------------------------------------------------------
+  // Web fallback
+  // ---------------------------------------------------------------------------
 
   if (Platform.OS === "web") {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, paddingTop: insets.top },
+        ]}
+      >
         <View style={styles.webHeader}>
-          <Text style={[styles.webTitle, { color: colors.foreground }]}>Parking Lots</Text>
-          <Input placeholder="Search parking lots..." value={search} onChangeText={setSearch} leftIcon={Search} />
+          <Text style={[styles.webTitle, { color: colors.foreground }]}>
+            Parking Lots
+          </Text>
+          <Input
+            placeholder="Search parking lots..."
+            value={search}
+            onChangeText={setSearch}
+            leftIcon={Search}
+          />
         </View>
         <FlatList
           data={parkingLots}
@@ -554,34 +972,102 @@ export default function MapScreen() {
             <TouchableOpacity onPress={() => router.push(`/parking/${item.id}`)}>
               <Card style={styles.lotCard}>
                 <View style={styles.lotHeader}>
-                  <Text style={[styles.lotName, { color: colors.foreground }]}>{item.name}</Text>
-                  <Badge label={item.type} variant={item.type === "free" ? "free" : "paid"} />
+                  <Text style={[styles.lotName, { color: colors.foreground }]}>
+                    {item.name}
+                  </Text>
+                  <Badge
+                    label={item.type}
+                    variant={item.type === "free" ? "free" : "paid"}
+                  />
                 </View>
-                <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>{item.address}</Text>
+                <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>
+                  {item.address}
+                </Text>
               </Card>
             </TouchableOpacity>
           )}
-          ListEmptyComponent={<View style={styles.empty}><Text style={{ color: colors.mutedForeground }}>No parking lots found</Text></View>}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={{ color: colors.mutedForeground }}>
+                No parking lots found
+              </Text>
+            </View>
+          }
         />
       </View>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Sheet content helpers
+  // ---------------------------------------------------------------------------
+
+  const sheetDistanceText = useMemo(() => {
+    if (!userLocationRef.current || !sheetItem) return null;
+    if (sheetItem.type === "lot") {
+      const { latitude, longitude } = sheetItem.data;
+      if (latitude == null || longitude == null) return null;
+      const d = getDistanceMeters(
+        userLocationRef.current.latitude,
+        userLocationRef.current.longitude,
+        latitude,
+        longitude
+      );
+      return formatDistance(d);
+    }
+    if (sheetItem.type === "zone") {
+      const { coord } = sheetItem.data;
+      const d = getDistanceMeters(
+        userLocationRef.current.latitude,
+        userLocationRef.current.longitude,
+        coord.latitude,
+        coord.longitude
+      );
+      return formatDistance(d);
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetItem]);
+
+  // ---------------------------------------------------------------------------
+  // Main JSX
+  // ---------------------------------------------------------------------------
+
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         region={region}
         onRegionChangeComplete={setRegion}
         showsUserLocation={!!locationPermission}
+        showsCompass={false}
+        zoomControlEnabled={false}
+        toolbarEnabled={false}
         onLongPress={handleLongPress}
+        onPress={() => {
+          if (filterOpen) setFilterOpen(false);
+        }}
       >
-        {/* Zone polygons */}
+        {/* Zone polygons — tappable with highlight */}
         {filteredZones.map((z: ZonePolygon) => {
-          const fillColor = z.type === "blue"
+          const isSelected = z.id === selectedZoneId;
+          const fillColor = isSelected
+            ? z.type === "blue"
+              ? zonePulse
+                ? "rgba(14,75,241,0.42)"
+                : "rgba(14,75,241,0.26)"
+              : zonePulse
+              ? "rgba(34,197,94,0.42)"
+              : "rgba(34,197,94,0.26)"
+            : z.type === "blue"
             ? "rgba(59,107,245,0.18)"
             : "rgba(34,197,94,0.13)";
-          const strokeColor = z.type === "blue"
+          const strokeColor = isSelected
+            ? z.type === "blue"
+              ? "rgba(14,75,241,1.0)"
+              : "rgba(34,197,94,1.0)"
+            : z.type === "blue"
             ? "rgba(14,75,241,0.7)"
             : "rgba(34,197,94,0.7)";
           return (
@@ -590,33 +1076,47 @@ export default function MapScreen() {
               coordinates={z.coordinates}
               fillColor={fillColor}
               strokeColor={strokeColor}
-              strokeWidth={2}
+              strokeWidth={isSelected ? 3.5 : 2}
               tappable
-              onPress={(e: any) => handleZonePress(e.nativeEvent.coordinate)}
+              onPress={(e: any) => {
+                const coord = e.nativeEvent.coordinate;
+                const zoneInfo = checkZone(coord.latitude, coord.longitude);
+                setSelectedZoneId(z.id);
+                openSheet({ type: "zone", data: { zone: z, zoneInfo, coord } });
+              }}
             />
           );
         })}
 
         {/* Parking machine markers */}
-        {filteredMachines.map((m: { lat: number; lng: number; title: string }, i: number) => (
-          <MachineMarker key={`machine-${i}`} lat={m.lat} lng={m.lng} />
-        ))}
+        {filteredMachines.map(
+          (m: { lat: number; lng: number; title: string }, i: number) => (
+            <MachineMarker key={`machine-${i}`} lat={m.lat} lng={m.lng} />
+          )
+        )}
 
         {/* Parking lot markers */}
         {filteredParkingLots.map((lot: any) => (
           <ParkingLotMarker
             key={lot.id}
             lot={lot}
-            onPress={() => { setSelectedLot(lot); setLongPressCoord(null); }}
+            onPress={() => {
+              openSheet({ type: "lot", data: lot });
+              setLongPressCoord(null);
+            }}
           />
         ))}
 
         {/* Vehicle location markers */}
         {vehicleMarkers.map((v: any) => (
-          <Marker key={`vehicle-${v.id}`} coordinate={{ latitude: v.latitude, longitude: v.longitude }} anchor={{ x: 0.5, y: 1 }}>
-            <View style={styles.carMarker}>
-              <Text style={styles.carMarkerEmoji}>🚗</Text>
-            </View>
+          <Marker
+            key={`vehicle-${v.id}`}
+            coordinate={{ latitude: v.latitude, longitude: v.longitude }}
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <AnimatedDropMarker>
+              <VehicleSvgMarker primaryColor={colors.primary} />
+            </AnimatedDropMarker>
           </Marker>
         ))}
 
@@ -636,15 +1136,26 @@ export default function MapScreen() {
         )}
       </MapView>
 
-      {/* Floating search + city selector */}
+      {/* -------------------------------------------------------------------- */}
+      {/* Floating search + city selector                                       */}
+      {/* -------------------------------------------------------------------- */}
+
       <View style={[styles.floatingSearch, { top: insets.top + 10 }]}>
         <View style={styles.searchRow}>
-          <Input placeholder="Search locations..." value={search} onChangeText={setSearch} leftIcon={Search} style={[styles.searchInput, { flex: 1 }]} />
+          <Input
+            placeholder="Search locations..."
+            value={search}
+            onChangeText={setSearch}
+            leftIcon={Search}
+            style={[styles.searchInput, { flex: 1 }]}
+          />
           <Pressable
             style={({ pressed }) => [
               styles.filterBtn,
               {
-                backgroundColor: filterOpen ? colors.primary + "18" : colors.card,
+                backgroundColor: filterOpen
+                  ? colors.primary + "18"
+                  : colors.card,
                 borderColor: filterOpen ? colors.primary : colors.border,
                 opacity: pressed ? 0.8 : 1,
                 transform: [{ scale: pressed ? 0.95 : 1 }],
@@ -685,18 +1196,23 @@ export default function MapScreen() {
         </View>
       </View>
 
-      {/* Filter panel — animated slide-in */}
+      {/* -------------------------------------------------------------------- */}
+      {/* Filter panel — animated slide-in                                      */}
+      {/* -------------------------------------------------------------------- */}
+
       <Animated.View
         style={[
           styles.filterPanel,
           {
             top: insets.top + 122,
-            transform: [{
-              translateX: filterAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [320, 0],
-              }),
-            }],
+            transform: [
+              {
+                translateX: filterAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [320, 0],
+                }),
+              },
+            ],
             opacity: filterAnim.interpolate({
               inputRange: [0, 1],
               outputRange: [0, 1],
@@ -707,26 +1223,51 @@ export default function MapScreen() {
       >
         <Card padding={false}>
           <View style={styles.filterPanelInner}>
-            <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>Filters</Text>
-
-            <FilterToggle label="🔵🟢 Zones" active={filters.zones} onPress={() => toggleFilter("zones")} />
-            <FilterToggle label="🆓 Free Parking" active={filters.freeParking} onPress={() => toggleFilter("freeParking")} />
-            <FilterToggle label="💳 Paid Parking" active={filters.paidParking} onPress={() => toggleFilter("paidParking")} />
-
-            {/* Penalty toggle — superadmin only */}
+            <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>
+              Filters
+            </Text>
+            <FilterToggle
+              label="🔵🟢 Zones"
+              active={filters.zones}
+              onPress={() => toggleFilter("zones")}
+            />
+            <FilterToggle
+              label="🆓 Free Parking"
+              active={filters.freeParking}
+              onPress={() => toggleFilter("freeParking")}
+            />
+            <FilterToggle
+              label="💳 Paid Parking"
+              active={filters.paidParking}
+              onPress={() => toggleFilter("paidParking")}
+            />
             {isSuperAdmin && (
               <>
-                <View style={[styles.filterDivider, { backgroundColor: colors.border }]} />
-                <FilterToggle label="🚫 Penalty Parking" active={filters.penaltyParking} onPress={() => toggleFilter("penaltyParking")} />
+                <View
+                  style={[styles.filterDivider, { backgroundColor: colors.border }]}
+                />
+                <FilterToggle
+                  label="🚫 Penalty Parking"
+                  active={filters.penaltyParking}
+                  onPress={() => toggleFilter("penaltyParking")}
+                />
                 <TouchableOpacity
                   style={[
                     styles.penaltyModeBtn,
-                    { borderColor: penaltyMode ? "#EF4444" : colors.border, backgroundColor: penaltyMode ? "#FEF2F2" : colors.muted },
+                    {
+                      borderColor: penaltyMode ? "#EF4444" : colors.border,
+                      backgroundColor: penaltyMode ? "#FEF2F2" : colors.muted,
+                    },
                   ]}
                   onPress={() => setPenaltyMode((v) => !v)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.penaltyModeText, { color: penaltyMode ? "#DC2626" : colors.foreground }]}>
+                  <Text
+                    style={[
+                      styles.penaltyModeText,
+                      { color: penaltyMode ? "#DC2626" : colors.foreground },
+                    ]}
+                  >
                     {penaltyMode ? "⚠️ Penalty Mode ON" : "Place Penalty Marker"}
                   </Text>
                 </TouchableOpacity>
@@ -736,13 +1277,71 @@ export default function MapScreen() {
         </Card>
       </Animated.View>
 
-      {/* Nearby machines active banner */}
+      {/* -------------------------------------------------------------------- */}
+      {/* Custom map controls — zoom +/- and centre on location                 */}
+      {/* -------------------------------------------------------------------- */}
+
+      {!filterOpen && (
+        <View
+          style={[
+            styles.mapControlsGroup,
+            { right: 16, bottom: 100 + insets.bottom + 72 },
+          ]}
+        >
+          <Pressable
+            style={({ pressed }) => [
+              styles.mapControlBtn,
+              { backgroundColor: colors.card, opacity: pressed ? 0.75 : 1 },
+            ]}
+            onPress={handleZoomIn}
+          >
+            <Plus size={20} color={colors.foreground} strokeWidth={2.5} />
+          </Pressable>
+          <View style={[styles.mapControlDivider, { backgroundColor: colors.border }]} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.mapControlBtn,
+              { backgroundColor: colors.card, opacity: pressed ? 0.75 : 1 },
+            ]}
+            onPress={handleZoomOut}
+          >
+            <Minus size={20} color={colors.foreground} strokeWidth={2.5} />
+          </Pressable>
+        </View>
+      )}
+
+      {!filterOpen && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.mapLocationBtn,
+            {
+              right: 16,
+              bottom: 100 + insets.bottom + 72 + 100,
+              backgroundColor: colors.card,
+              opacity: pressed ? 0.75 : 1,
+            },
+          ]}
+          onPress={handleCenterOnUser}
+        >
+          <MapPin size={20} color={colors.primary} strokeWidth={2} />
+        </Pressable>
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* Nearby machines active banner                                          */}
+      {/* -------------------------------------------------------------------- */}
+
       {nearbyMachinesCoord && (
-        <View style={[styles.nearbyMachinesBanner, { bottom: 100 + insets.bottom }]}>
+        <View
+          style={[styles.nearbyMachinesBanner, { bottom: 100 + insets.bottom }]}
+        >
           <Text style={styles.nearbyMachinesText}>💲 Showing nearby machines</Text>
           <Pressable
             onPress={() => setNearbyMachinesCoord(null)}
-            style={({ pressed }) => [styles.nearbyMachinesClear, { opacity: pressed ? 0.7 : 1 }]}
+            style={({ pressed }) => [
+              styles.nearbyMachinesClear,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
           >
             <X size={14} color={colors.mutedForeground} strokeWidth={2.5} />
             <Text style={styles.nearbyMachinesClearText}>Clear</Text>
@@ -750,14 +1349,24 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Zone banner — slides in when user is in a zone */}
+      {/* -------------------------------------------------------------------- */}
+      {/* Zone banner — slides in when user is in a zone                        */}
+      {/* -------------------------------------------------------------------- */}
+
       <Animated.View
         style={[
           styles.zoneBanner,
           { top: insets.top + 68 },
           {
             opacity: bannerAnim,
-            transform: [{ translateY: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+            transform: [
+              {
+                translateY: bannerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-16, 0],
+                }),
+              },
+            ],
           },
           zoneResult.zone === "blue"
             ? styles.zoneBannerBlue
@@ -782,29 +1391,9 @@ export default function MapScreen() {
         </View>
       </Animated.View>
 
-      {selectedLot && !longPressCoord && !selectedPenalty && (
-        <View style={[styles.bottomSheet, { bottom: 100 + insets.bottom }]}>
-          <Card padding={false}>
-            <Pressable
-              onPress={() => setSelectedLot(null)}
-              style={({ pressed }) => [styles.closeButton, { opacity: pressed ? 0.6 : 1 }]}
-            >
-              <X size={20} color={colors.mutedForeground} strokeWidth={2.5} />
-            </Pressable>
-            <View style={{ padding: 16 }}>
-              <View style={styles.lotHeader}>
-                <Text style={[styles.lotName, { color: colors.foreground }]}>{selectedLot.name}</Text>
-                <Badge label={selectedLot.type} variant={selectedLot.type === "free" ? "free" : "paid"} />
-              </View>
-              <Text style={[styles.lotAddress, { color: colors.mutedForeground }]}>{selectedLot.address}</Text>
-              <TouchableOpacity style={[styles.detailsButton, { backgroundColor: colors.primary }]} onPress={() => router.push(`/parking/${selectedLot.id}`)}>
-                <Text style={styles.detailsButtonText}>View Details</Text>
-                <Text style={styles.arrowEmoji}>→</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-        </View>
-      )}
+      {/* -------------------------------------------------------------------- */}
+      {/* FABs (admin settings / start session)                                 */}
+      {/* -------------------------------------------------------------------- */}
 
       {isSuperAdmin && (
         <Pressable
@@ -838,7 +1427,10 @@ export default function MapScreen() {
             if (selectedLot) {
               router.push(`/parking/${selectedLot.id}`);
             } else {
-              Alert.alert("Select a Lot", "Tap a parking lot on the map to start a session.");
+              Alert.alert(
+                "Select a Lot",
+                "Tap a parking lot on the map to start a session."
+              );
             }
           }}
         >
@@ -846,18 +1438,362 @@ export default function MapScreen() {
         </Pressable>
       )}
 
-      {/* Penalty marker info modal */}
-      <Modal visible={!!selectedPenalty} transparent animationType="fade" onRequestClose={() => setSelectedPenalty(null)}>
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setSelectedPenalty(null)} />
-        <View style={[styles.penaltyModal, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+      {/* -------------------------------------------------------------------- */}
+      {/* Custom bottom sheet info panel                                        */}
+      {/* -------------------------------------------------------------------- */}
+
+      {sheetItem && !longPressCoord && !selectedPenalty && (
+        <>
+          {/* Tap-outside overlay */}
+          <Pressable style={styles.sheetOverlay} onPress={closeSheet} />
+
+          {/* Animated sheet */}
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.card,
+                paddingBottom: insets.bottom + 20,
+                transform: [{ translateY: sheetTranslateY }],
+              },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            {/* Handle bar + close */}
+            <View style={styles.sheetTopRow}>
+              <View style={styles.sheetHandle} />
+              <Pressable
+                onPress={closeSheet}
+                style={({ pressed }) => [
+                  styles.sheetCloseBtn,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <X size={18} color={colors.mutedForeground} strokeWidth={2.5} />
+              </Pressable>
+            </View>
+
+            {/* ---- Parking lot sheet ---- */}
+            {sheetItem.type === "lot" && (
+              <View style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text
+                    style={[styles.sheetName, { color: colors.foreground }]}
+                    numberOfLines={2}
+                  >
+                    {sheetItem.data.name}
+                  </Text>
+                  <Badge
+                    label={sheetItem.data.type}
+                    variant={sheetItem.data.type === "free" ? "free" : "paid"}
+                  />
+                </View>
+
+                {!!sheetItem.data.address && (
+                  <Text
+                    style={[styles.sheetMeta, { color: colors.mutedForeground }]}
+                  >
+                    {sheetItem.data.address}
+                  </Text>
+                )}
+
+                <View style={styles.sheetInfoRow}>
+                  {sheetDistanceText && (
+                    <View style={styles.sheetInfoChip}>
+                      <MapPin size={13} color={colors.primary} strokeWidth={2} />
+                      <Text style={[styles.sheetInfoText, { color: colors.mutedForeground }]}>
+                        {sheetDistanceText}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.sheetInfoChip}>
+                    <Text style={[styles.sheetInfoText, { color: colors.mutedForeground }]}>
+                      {sheetItem.data.type === "free"
+                        ? "🆓 Free parking"
+                        : "💳 Paid parking"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.sheetActions}>
+                  {/* Favourite toggle */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sheetFavBtn,
+                      {
+                        borderColor: favouriteIds.has(sheetItem.data.id)
+                          ? "#EF4444"
+                          : colors.border,
+                        backgroundColor: favouriteIds.has(sheetItem.data.id)
+                          ? "#FEF2F2"
+                          : colors.muted,
+                        opacity: pressed ? 0.75 : 1,
+                        transform: [{ scale: pressed ? 0.92 : 1 }],
+                      },
+                    ]}
+                    onPress={() => toggleFavourite(sheetItem.data.id)}
+                  >
+                    <Heart
+                      size={20}
+                      color={
+                        favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.mutedForeground
+                      }
+                      strokeWidth={2}
+                      fill={favouriteIds.has(sheetItem.data.id) ? "#EF4444" : "none"}
+                    />
+                  </Pressable>
+
+                  {/* Navigate */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sheetBtn,
+                      {
+                        backgroundColor: colors.muted,
+                        borderColor: colors.border,
+                        opacity: pressed ? 0.8 : 1,
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      },
+                    ]}
+                    onPress={() =>
+                      handleNavigate(
+                        sheetItem.data.latitude,
+                        sheetItem.data.longitude,
+                        sheetItem.data.name
+                      )
+                    }
+                  >
+                    <Navigation size={16} color={colors.foreground} strokeWidth={2} />
+                    <Text style={[styles.sheetBtnText, { color: colors.foreground }]}>
+                      Navigate
+                    </Text>
+                  </Pressable>
+
+                  {/* Start Session */}
+                  {!isSuperAdmin && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.sheetBtn,
+                        {
+                          backgroundColor: colors.primary,
+                          opacity: pressed ? 0.85 : 1,
+                          transform: [{ scale: pressed ? 0.96 : 1 }],
+                        },
+                      ]}
+                      onPress={() => router.push(`/parking/${sheetItem.data.id}`)}
+                    >
+                      <PlayCircle size={16} color="white" strokeWidth={2} />
+                      <Text style={[styles.sheetBtnText, { color: "white" }]}>
+                        Start Session
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {/* View Details (admin) */}
+                  {isSuperAdmin && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.sheetBtn,
+                        {
+                          backgroundColor: colors.primary,
+                          opacity: pressed ? 0.85 : 1,
+                          transform: [{ scale: pressed ? 0.96 : 1 }],
+                        },
+                      ]}
+                      onPress={() => router.push(`/parking/${sheetItem.data.id}`)}
+                    >
+                      <Text style={[styles.sheetBtnText, { color: "white" }]}>
+                        View Details →
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* ---- Zone sheet ---- */}
+            {sheetItem.type === "zone" && (
+              <View style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text
+                    style={[styles.sheetName, { color: colors.foreground }]}
+                    numberOfLines={1}
+                  >
+                    {sheetItem.data.zone.type === "blue"
+                      ? "Blue Parking Zone"
+                      : "Green Parking Zone"}
+                  </Text>
+                  <View
+                    style={[
+                      styles.zoneBadge,
+                      {
+                        backgroundColor:
+                          sheetItem.data.zone.type === "blue"
+                            ? "#EEF3FF"
+                            : "#F0FFF6",
+                        borderColor:
+                          sheetItem.data.zone.type === "blue"
+                            ? "rgba(14,75,241,0.35)"
+                            : "rgba(34,197,94,0.35)",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.zoneBadgeText,
+                        {
+                          color:
+                            sheetItem.data.zone.type === "blue"
+                              ? "#0E4BF1"
+                              : "#16A34A",
+                        },
+                      ]}
+                    >
+                      {sheetItem.data.zone.type === "blue" ? "Blue" : "Green"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.sheetInfoRow}>
+                  {sheetDistanceText && (
+                    <View style={styles.sheetInfoChip}>
+                      <MapPin size={13} color={colors.primary} strokeWidth={2} />
+                      <Text
+                        style={[
+                          styles.sheetInfoText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        {sheetDistanceText}
+                      </Text>
+                    </View>
+                  )}
+                  {sheetItem.data.zoneInfo.hourlyRate != null && (
+                    <View style={styles.sheetInfoChip}>
+                      <Text
+                        style={[
+                          styles.sheetInfoText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        💰 {sheetItem.data.zoneInfo.hourlyRate?.toFixed(2)} BGN/hr
+                      </Text>
+                    </View>
+                  )}
+                  {sheetItem.data.zoneInfo.smsCode && (
+                    <View style={styles.sheetInfoChip}>
+                      <Text
+                        style={[
+                          styles.sheetInfoText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        📱 SMS: {sheetItem.data.zoneInfo.smsCode}
+                      </Text>
+                    </View>
+                  )}
+                  {!sheetItem.data.zoneInfo.hourlyRate && (
+                    <View style={styles.sheetInfoChip}>
+                      <Text
+                        style={[
+                          styles.sheetInfoText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        🆓 Free parking zone
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.sheetActions}>
+                  {/* Navigate to zone */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sheetBtn,
+                      {
+                        backgroundColor: colors.muted,
+                        borderColor: colors.border,
+                        opacity: pressed ? 0.8 : 1,
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      },
+                    ]}
+                    onPress={() =>
+                      handleNavigate(
+                        sheetItem.data.coord.latitude,
+                        sheetItem.data.coord.longitude,
+                        sheetItem.data.zone.type === "blue"
+                          ? "Blue Parking Zone"
+                          : "Green Parking Zone"
+                      )
+                    }
+                  >
+                    <Navigation size={16} color={colors.foreground} strokeWidth={2} />
+                    <Text style={[styles.sheetBtnText, { color: colors.foreground }]}>
+                      Navigate
+                    </Text>
+                  </Pressable>
+
+                  {/* Show nearby machines */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sheetBtn,
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: pressed ? 0.85 : 1,
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      },
+                    ]}
+                    onPress={() => {
+                      setNearbyMachinesCoord(sheetItem.data.coord);
+                      closeSheet();
+                    }}
+                  >
+                    <Text style={[styles.sheetBtnText, { color: "white" }]}>
+                      💲 Nearby Machines
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </Animated.View>
+        </>
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* Penalty marker info modal                                             */}
+      {/* -------------------------------------------------------------------- */}
+
+      <Modal
+        visible={!!selectedPenalty}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedPenalty(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setSelectedPenalty(null)}
+        />
+        <View
+          style={[
+            styles.penaltyModal,
+            {
+              backgroundColor: colors.card,
+              paddingBottom: insets.bottom + 16,
+            },
+          ]}
+        >
           <View style={styles.bubbleHandle} />
           <View style={styles.penaltyModalHeader}>
             <Text style={styles.penaltyEmojiLarge}>⚠️</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.bubbleTitle, { color: colors.foreground }]}>Penalty Marker</Text>
+              <Text style={[styles.bubbleTitle, { color: colors.foreground }]}>
+                Penalty Marker
+              </Text>
               {selectedPenalty && (
                 <Text style={[styles.bubbleCoords, { color: colors.mutedForeground }]}>
-                  {selectedPenalty.latitude.toFixed(4)}, {selectedPenalty.longitude.toFixed(4)}
+                  {selectedPenalty.latitude.toFixed(4)},{" "}
+                  {selectedPenalty.longitude.toFixed(4)}
                 </Text>
               )}
             </View>
@@ -871,7 +1807,10 @@ export default function MapScreen() {
 
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              Placed: {selectedPenalty ? new Date(selectedPenalty.timestamp).toLocaleString() : ""}
+              Placed:{" "}
+              {selectedPenalty
+                ? new Date(selectedPenalty.timestamp).toLocaleString()
+                : ""}
             </Text>
             <Input
               label="Note"
@@ -904,10 +1843,27 @@ export default function MapScreen() {
         </View>
       </Modal>
 
-      {/* Long-press bubble — superadmin only */}
-      <Modal visible={!!longPressCoord} transparent animationType="slide" onRequestClose={() => setLongPressCoord(null)}>
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setLongPressCoord(null)} />
-        <View style={[styles.bubble, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+      {/* -------------------------------------------------------------------- */}
+      {/* Long-press bubble — superadmin add/remove parking lot                 */}
+      {/* -------------------------------------------------------------------- */}
+
+      <Modal
+        visible={!!longPressCoord}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLongPressCoord(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setLongPressCoord(null)}
+        />
+        <View
+          style={[
+            styles.bubble,
+            { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 },
+          ]}
+        >
           <View style={styles.bubbleHandle} />
 
           <View style={styles.bubbleHeader}>
@@ -918,7 +1874,8 @@ export default function MapScreen() {
               </Text>
               {longPressCoord && (
                 <Text style={[styles.bubbleCoords, { color: colors.mutedForeground }]}>
-                  {longPressCoord.latitude.toFixed(4)}, {longPressCoord.longitude.toFixed(4)}
+                  {longPressCoord.latitude.toFixed(4)},{" "}
+                  {longPressCoord.longitude.toFixed(4)}
                 </Text>
               )}
             </View>
@@ -930,7 +1887,11 @@ export default function MapScreen() {
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 520 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={{ maxHeight: 520 }}
+          >
             <View style={styles.section}>
               <Input
                 label="Parking Lot Name"
@@ -938,15 +1899,33 @@ export default function MapScreen() {
                 value={addForm.name}
                 onChangeText={(t) => setAddForm((f) => ({ ...f, name: t }))}
               />
-              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Type</Text>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                Type
+              </Text>
               <View style={styles.typeRow}>
                 {(["free", "paid"] as const).map((t) => (
                   <TouchableOpacity
                     key={t}
-                    style={[styles.typeBtn, { borderColor: colors.border }, addForm.type === t && { backgroundColor: t === "free" ? colors.parkingFree : colors.parkingPaid, borderColor: "transparent" }]}
+                    style={[
+                      styles.typeBtn,
+                      { borderColor: colors.border },
+                      addForm.type === t && {
+                        backgroundColor:
+                          t === "free" ? colors.parkingFree : colors.parkingPaid,
+                        borderColor: "transparent",
+                      },
+                    ]}
                     onPress={() => setAddForm((f) => ({ ...f, type: t }))}
                   >
-                    <Text style={[styles.typeBtnText, { color: addForm.type === t ? "white" : colors.foreground }]}>
+                    <Text
+                      style={[
+                        styles.typeBtnText,
+                        {
+                          color:
+                            addForm.type === t ? "white" : colors.foreground,
+                        },
+                      ]}
+                    >
                       {t === "free" ? "🟢 Free" : "🟠 Paid"}
                     </Text>
                   </TouchableOpacity>
@@ -959,7 +1938,9 @@ export default function MapScreen() {
                 label="📝  Description"
                 placeholder="e.g. Underground parking, max height 2m..."
                 value={addForm.description}
-                onChangeText={(t) => setAddForm((f) => ({ ...f, description: t }))}
+                onChangeText={(t) =>
+                  setAddForm((f) => ({ ...f, description: t }))
+                }
                 multiline
               />
             </View>
@@ -969,49 +1950,91 @@ export default function MapScreen() {
                 label="⏰  Opening Hours"
                 placeholder="e.g. Mon–Fri 08:00–20:00, Sat–Sun 09:00–18:00"
                 value={addForm.openingHours}
-                onChangeText={(t) => setAddForm((f) => ({ ...f, openingHours: t }))}
+                onChangeText={(t) =>
+                  setAddForm((f) => ({ ...f, openingHours: t }))
+                }
                 multiline
               />
             </View>
 
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>📸  Photos</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                📸  Photos
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.photoRow}
+              >
                 {addForm.photos.map((uri, i) => (
                   <TouchableOpacity
                     key={i}
                     onPress={() => setAddForm((f) => ({ ...f, mainPhotoIndex: i }))}
                     style={styles.photoThumbWrap}
                   >
-                    <Image source={{ uri }} style={[styles.photoThumb, addForm.mainPhotoIndex === i && styles.photoThumbMain]} />
+                    <Image
+                      source={{ uri }}
+                      style={[
+                        styles.photoThumb,
+                        addForm.mainPhotoIndex === i && styles.photoThumbMain,
+                      ]}
+                    />
                     {addForm.mainPhotoIndex === i && (
-                      <View style={styles.mainBadge}><Text style={styles.mainBadgeText}>MAIN</Text></View>
+                      <View style={styles.mainBadge}>
+                        <Text style={styles.mainBadgeText}>MAIN</Text>
+                      </View>
                     )}
                     <Pressable
-                      style={({ pressed }) => [styles.photoRemoveBtn, { opacity: pressed ? 0.7 : 1 }]}
-                      onPress={() => setAddForm((f) => {
-                        const photos = f.photos.filter((_, j) => j !== i);
-                        return { ...f, photos, mainPhotoIndex: Math.min(f.mainPhotoIndex, Math.max(0, photos.length - 1)) };
-                      })}
+                      style={({ pressed }) => [
+                        styles.photoRemoveBtn,
+                        { opacity: pressed ? 0.7 : 1 },
+                      ]}
+                      onPress={() =>
+                        setAddForm((f) => {
+                          const photos = f.photos.filter((_, j) => j !== i);
+                          return {
+                            ...f,
+                            photos,
+                            mainPhotoIndex: Math.min(
+                              f.mainPhotoIndex,
+                              Math.max(0, photos.length - 1)
+                            ),
+                          };
+                        })
+                      }
                     >
                       <X size={12} color="white" strokeWidth={3} />
                     </Pressable>
                   </TouchableOpacity>
                 ))}
-                <TouchableOpacity style={[styles.addPhotoBtn, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={pickPhotos}>
+                <TouchableOpacity
+                  style={[
+                    styles.addPhotoBtn,
+                    { borderColor: colors.border, backgroundColor: colors.muted },
+                  ]}
+                  onPress={pickPhotos}
+                >
                   <Text style={styles.addPhotoBtnText}>➕</Text>
-                  <Text style={[styles.addPhotoBtnLabel, { color: colors.mutedForeground }]}>Add Photo</Text>
+                  <Text
+                    style={[styles.addPhotoBtnLabel, { color: colors.mutedForeground }]}
+                  >
+                    Add Photo
+                  </Text>
                 </TouchableOpacity>
               </ScrollView>
               {addForm.photos.length > 1 && (
-                <Text style={[styles.mainPhotoHint, { color: colors.mutedForeground }]}>
+                <Text
+                  style={[styles.mainPhotoHint, { color: colors.mutedForeground }]}
+                >
                   Tap a photo to set it as the main map marker image
                 </Text>
               )}
             </View>
 
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>🏷️  Amenities</Text>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                🏷️  Amenities
+              </Text>
               <View style={styles.amenityGrid}>
                 {AMENITIES.map(({ key, label, emoji }) => {
                   const active = addForm.amenities[key];
@@ -1021,12 +2044,28 @@ export default function MapScreen() {
                       onPress={() => toggleAmenity(key)}
                       style={[
                         styles.amenityChip,
-                        { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + "15" : colors.muted },
+                        {
+                          borderColor: active ? colors.primary : colors.border,
+                          backgroundColor: active
+                            ? colors.primary + "15"
+                            : colors.muted,
+                        },
                       ]}
                     >
                       <Text style={styles.amenityEmoji}>{emoji}</Text>
-                      <Text style={[styles.amenityLabel, { color: active ? colors.primary : colors.foreground }]}>{label}</Text>
-                      {active && <Text style={[styles.amenityCheck, { color: colors.primary }]}>✓</Text>}
+                      <Text
+                        style={[
+                          styles.amenityLabel,
+                          { color: active ? colors.primary : colors.foreground },
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                      {active && (
+                        <Text style={[styles.amenityCheck, { color: colors.primary }]}>
+                          ✓
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   );
                 })}
@@ -1035,25 +2074,44 @@ export default function MapScreen() {
 
             <View style={[styles.section, { paddingBottom: 4 }]}>
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: colors.primary }, (!addForm.name.trim() || isSaving) && { opacity: 0.5 }]}
+                style={[
+                  styles.saveBtn,
+                  { backgroundColor: colors.primary },
+                  (!addForm.name.trim() || isSaving) && { opacity: 0.5 },
+                ]}
                 onPress={handleAddPark}
                 disabled={!addForm.name.trim() || isSaving}
               >
-                <Text style={styles.saveBtnText}>{isSaving ? "Adding…" : "➕  Add Parking Lot"}</Text>
+                <Text style={styles.saveBtnText}>
+                  {isSaving ? "Adding…" : "➕  Add Parking Lot"}
+                </Text>
               </TouchableOpacity>
             </View>
 
             {nearbyLot && (
-              <View style={[styles.removeSection, { borderTopColor: colors.border }]}>
-                <Text style={[styles.removeLabel, { color: colors.mutedForeground }]}>
-                  Nearby: <Text style={{ fontWeight: "700", color: colors.foreground }}>{nearbyLot.name}</Text>
+              <View
+                style={[styles.removeSection, { borderTopColor: colors.border }]}
+              >
+                <Text
+                  style={[styles.removeLabel, { color: colors.mutedForeground }]}
+                >
+                  Nearby:{" "}
+                  <Text style={{ fontWeight: "700", color: colors.foreground }}>
+                    {nearbyLot.name}
+                  </Text>
                 </Text>
                 <TouchableOpacity
-                  style={[styles.removeBtn, { borderColor: colors.destructive }, isRemoving && { opacity: 0.5 }]}
+                  style={[
+                    styles.removeBtn,
+                    { borderColor: colors.destructive },
+                    isRemoving && { opacity: 0.5 },
+                  ]}
                   onPress={handleRemovePark}
                   disabled={isRemoving}
                 >
-                  <Text style={[styles.removeBtnText, { color: colors.destructive }]}>
+                  <Text
+                    style={[styles.removeBtnText, { color: colors.destructive }]}
+                  >
                     {isRemoving ? "Removing…" : `🗑️  Remove "${nearbyLot.name}"`}
                   </Text>
                 </TouchableOpacity>
@@ -1070,7 +2128,15 @@ export default function MapScreen() {
 // Filter toggle sub-component
 // ---------------------------------------------------------------------------
 
-function FilterToggle({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function FilterToggle({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
   return (
     <TouchableOpacity
       style={styles.filterToggleRow}
@@ -1080,8 +2146,18 @@ function FilterToggle({ label, active, onPress }: { label: string; active: boole
       <Text style={[styles.filterToggleLabel, { opacity: active ? 1 : 0.45 }]}>
         {label}
       </Text>
-      <View style={[styles.filterToggleSwitch, active && styles.filterToggleSwitchOn]}>
-        <View style={[styles.filterToggleKnob, active && styles.filterToggleKnobOn]} />
+      <View
+        style={[
+          styles.filterToggleSwitch,
+          active && styles.filterToggleSwitchOn,
+        ]}
+      >
+        <View
+          style={[
+            styles.filterToggleKnob,
+            active && styles.filterToggleKnobOn,
+          ]}
+        />
       </View>
     </TouchableOpacity>
   );
@@ -1093,24 +2169,8 @@ function FilterToggle({ label, active, onPress }: { label: string; active: boole
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  marker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2.5,
-    borderColor: "white",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    overflow: "hidden",
-  },
-  parkingPinImage: { width: 44, height: 52 },
-  markerPhoto: { width: 36, height: 36, borderRadius: 18 },
-  markerEmoji: { fontSize: 16 },
+
+  // Markers
   machineMarker: {
     width: 28,
     height: 28,
@@ -1122,29 +2182,11 @@ const styles = StyleSheet.create({
     borderColor: "#FF9800",
   },
   machineEmoji: { fontSize: 13 },
-  penaltyMarkerView: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#FEE2E2",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#EF4444",
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  penaltyEmoji: { fontSize: 16 },
   penaltyEmojiLarge: { fontSize: 28 },
   pinEmoji: { fontSize: 32 },
-  searchRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-  },
+
+  // Search + controls
+  searchRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   filterBtn: {
     width: 50,
     height: 50,
@@ -1181,39 +2223,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  citySegmentText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  filterPanel: {
-    position: "absolute",
-    right: 16,
-    width: 220,
-    zIndex: 12,
-  },
-  filterPanelInner: {
-    padding: 14,
-    gap: 2,
-  },
-  filterPanelTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  filterDivider: {
-    height: 1,
-    marginVertical: 6,
-  },
+  citySegmentText: { fontSize: 13, fontWeight: "600" },
+
+  // Filter panel
+  filterPanel: { position: "absolute", right: 16, width: 220, zIndex: 12 },
+  filterPanelInner: { padding: 14, gap: 2 },
+  filterPanelTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8 },
+  filterDivider: { height: 1, marginVertical: 6 },
   filterToggleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 6,
   },
-  filterToggleLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
+  filterToggleLabel: { fontSize: 13, fontWeight: "500" },
   filterToggleSwitch: {
     width: 36,
     height: 20,
@@ -1222,18 +2245,14 @@ const styles = StyleSheet.create({
     padding: 2,
     justifyContent: "center",
   },
-  filterToggleSwitchOn: {
-    backgroundColor: "#3B6BF5",
-  },
+  filterToggleSwitchOn: { backgroundColor: "#3B6BF5" },
   filterToggleKnob: {
     width: 16,
     height: 16,
     borderRadius: 8,
     backgroundColor: "white",
   },
-  filterToggleKnobOn: {
-    alignSelf: "flex-end",
-  },
+  filterToggleKnobOn: { alignSelf: "flex-end" },
   penaltyModeBtn: {
     height: 38,
     borderRadius: 10,
@@ -1242,10 +2261,248 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 6,
   },
-  penaltyModeText: {
-    fontSize: 12,
-    fontWeight: "600",
+  penaltyModeText: { fontSize: 12, fontWeight: "600" },
+
+  // Custom map controls
+  mapControlsGroup: {
+    position: "absolute",
+    zIndex: 10,
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
+  mapControlBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapControlDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 10 },
+  mapLocationBtn: {
+    position: "absolute",
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  // Nearby machines banner
+  nearbyMachinesBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF8E1",
+    borderWidth: 1.5,
+    borderColor: "#FF9800",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  nearbyMachinesText: { fontSize: 13, fontWeight: "600", color: "#E65100" },
+  nearbyMachinesClear: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#FF9800",
+    borderRadius: 8,
+  },
+  nearbyMachinesClearText: { fontSize: 12, fontWeight: "700", color: "white" },
+
+  // Zone banner
+  zoneBanner: {
+    position: "absolute",
+    left: 16,
+    right: 100,
+    zIndex: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  zoneBannerBlue: {
+    backgroundColor: "#EEF3FF",
+    borderWidth: 1.5,
+    borderColor: "rgba(14,75,241,0.25)",
+  },
+  zoneBannerGreen: {
+    backgroundColor: "#F0FFF6",
+    borderWidth: 1.5,
+    borderColor: "rgba(34,197,94,0.3)",
+  },
+  zoneBannerEmoji: { fontSize: 22 },
+  zoneBannerTitle: { fontSize: 13, fontWeight: "700", color: "#1A1A2E" },
+  zoneBannerSub: { fontSize: 11, color: "#555", marginTop: 1 },
+
+  // FABs
+  adminFab: {
+    position: "absolute",
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    zIndex: 10,
+  },
+  sessionFab: {
+    position: "absolute",
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    zIndex: 10,
+  },
+
+  // Custom bottom sheet
+  sheetOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 24,
+  },
+  sheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 25,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+    elevation: 18,
+  },
+  sheetTopRow: {
+    alignItems: "center",
+    marginBottom: 4,
+    paddingHorizontal: 16,
+    position: "relative",
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#DDD",
+    alignSelf: "center",
+  },
+  sheetCloseBtn: {
+    position: "absolute",
+    right: 16,
+    top: -6,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 6,
+    gap: 10,
+  },
+  sheetName: { fontSize: 18, fontWeight: "700", flex: 1 },
+  sheetMeta: { fontSize: 13, marginBottom: 8 },
+  sheetInfoRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  sheetInfoChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F4F6FF",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  sheetInfoText: { fontSize: 12, fontWeight: "500" },
+  sheetActions: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  sheetBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  sheetBtnText: { fontWeight: "600", fontSize: 14 },
+  sheetFavBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+  },
+  zoneBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+    flexShrink: 0,
+  },
+  zoneBadgeText: { fontSize: 12, fontWeight: "700" },
+
+  // Penalty modal
   penaltyModal: {
     position: "absolute",
     bottom: 0,
@@ -1267,155 +2524,141 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     gap: 12,
   },
-  legend: { position: "absolute", right: 16, width: 86, zIndex: 10, padding: 10 },
-  legendItem: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
-  legendText: { fontSize: 12, fontWeight: "500" },
-  legendDivider: { height: 1, marginVertical: 4 },
-  zoneBanner: {
-    position: "absolute",
-    left: 16,
-    right: 100,
-    zIndex: 15,
+
+  // Long-press bubble (add parking)
+  bubble: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  bubbleHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#DDD",
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  bubbleHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingHorizontal: 20,
+    marginBottom: 4,
+    gap: 12,
   },
-  zoneBannerBlue: { backgroundColor: "#EEF3FF", borderWidth: 1.5, borderColor: "rgba(14,75,241,0.25)" },
-  zoneBannerGreen: { backgroundColor: "#F0FFF6", borderWidth: 1.5, borderColor: "rgba(34,197,94,0.3)" },
-  zoneBannerEmoji: { fontSize: 22 },
-  zoneBannerTitle: { fontSize: 13, fontWeight: "700", color: "#1A1A2E" },
-  zoneBannerSub: { fontSize: 11, color: "#555", marginTop: 1 },
-  bottomSheet: { position: "absolute", left: 16, right: 16, zIndex: 20 },
-  closeButton: { position: "absolute", right: 12, top: 12, zIndex: 30 },
-  lotHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 },
-  lotName: { fontSize: 18, fontWeight: "700", flex: 1, marginRight: 8 },
-  lotAddress: { fontSize: 14, marginBottom: 16 },
-  detailsButton: { flexDirection: "row", height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", gap: 8 },
-  detailsButtonText: { color: "white", fontWeight: "600", fontSize: 16 },
-  arrowEmoji: { fontSize: 16, color: "white", fontWeight: "600" },
-  adminFab: {
-    position: "absolute", right: 16, width: 56, height: 56, borderRadius: 28,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65,
-    elevation: 8, zIndex: 10,
-  },
-  sessionFab: {
-    position: "absolute", right: 16, width: 56, height: 56, borderRadius: 28,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65,
-    elevation: 8, zIndex: 10,
-  },
-  webHeader: { padding: 16, gap: 16 },
-  webTitle: { fontSize: 24, fontWeight: "700" },
-  webList: { padding: 16, gap: 12 },
-  lotCard: { marginBottom: 4 },
-  empty: { padding: 40, alignItems: "center" },
-  modalBackdrop: { flex: 1 },
-  bubble: {
-    borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 16,
-  },
-  bubbleHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#DDD", alignSelf: "center", marginBottom: 12 },
-  bubbleHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, marginBottom: 4, gap: 12 },
   bubblePin: { fontSize: 26 },
   bubbleTitle: { fontSize: 17, fontWeight: "700" },
   bubbleCoords: { fontSize: 11, marginTop: 1 },
+
+  // Form sections
   section: { paddingHorizontal: 20, paddingTop: 12, gap: 8 },
   sectionLabel: { fontSize: 13, fontWeight: "600", marginBottom: -4 },
   typeRow: { flexDirection: "row", gap: 10 },
-  typeBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  typeBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   typeBtnText: { fontWeight: "600", fontSize: 15 },
   photoRow: { gap: 10, paddingVertical: 4 },
   photoThumbWrap: { position: "relative" },
   photoThumb: { width: 80, height: 80, borderRadius: 10 },
   photoThumbMain: { borderWidth: 2.5, borderColor: "#0E4BF1" },
   mainBadge: {
-    position: "absolute", bottom: 4, left: 4, backgroundColor: "#0E4BF1",
-    borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1,
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    backgroundColor: "#0E4BF1",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
   },
   mainBadgeText: { color: "white", fontSize: 9, fontWeight: "700" },
   photoRemoveBtn: {
-    position: "absolute", top: -6, right: -6, width: 20, height: 20,
-    borderRadius: 10, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center",
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   addPhotoBtn: {
-    width: 80, height: 80, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed",
-    alignItems: "center", justifyContent: "center", gap: 4,
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
   },
   addPhotoBtnText: { fontSize: 20 },
   addPhotoBtnLabel: { fontSize: 10, fontWeight: "600" },
   mainPhotoHint: { fontSize: 11, marginTop: -4 },
   amenityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   amenityChip: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
-  },
-  amenityEmoji: { fontSize: 14 },
-  amenityLabel: { fontSize: 12, fontWeight: "600" },
-  amenityCheck: { fontSize: 12, fontWeight: "800" },
-  saveBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  saveBtnText: { color: "white", fontWeight: "700", fontSize: 16 },
-  removeSection: {
-    marginTop: 12, paddingTop: 14, paddingHorizontal: 20, paddingBottom: 8,
-    borderTopWidth: StyleSheet.hairlineWidth, gap: 10,
-  },
-  removeLabel: { fontSize: 13 },
-  removeBtn: { height: 46, borderRadius: 12, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
-  removeBtnText: { fontWeight: "700", fontSize: 15 },
-  nearbyMachinesBanner: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    zIndex: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFF8E1",
-    borderWidth: 1.5,
-    borderColor: "#FF9800",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  carMarker: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#EEF3FF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2.5,
-    borderColor: "#3B6BF5",
-    shadowColor: "#3B6BF5",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  carMarkerEmoji: { fontSize: 18 },
-  nearbyMachinesText: { fontSize: 13, fontWeight: "600", color: "#E65100" },
-  nearbyMachinesClear: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#FF9800",
-    borderRadius: 8,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
-  nearbyMachinesClearText: { fontSize: 12, fontWeight: "700", color: "white" },
+  amenityEmoji: { fontSize: 14 },
+  amenityLabel: { fontSize: 12, fontWeight: "600" },
+  amenityCheck: { fontSize: 12, fontWeight: "800" },
+  saveBtn: {
+    height: 50,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtnText: { color: "white", fontWeight: "700", fontSize: 16 },
+  removeSection: {
+    marginTop: 12,
+    paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  removeLabel: { fontSize: 13 },
+  removeBtn: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removeBtnText: { fontWeight: "700", fontSize: 15 },
+
+  // Web list view
+  webHeader: { padding: 16, gap: 16 },
+  webTitle: { fontSize: 24, fontWeight: "700" },
+  webList: { padding: 16, gap: 12 },
+  lotCard: { marginBottom: 4 },
+  lotHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+  lotName: { fontSize: 18, fontWeight: "700", flex: 1, marginRight: 8 },
+  lotAddress: { fontSize: 14, marginBottom: 16 },
+  empty: { padding: 40, alignItems: "center" },
+
+  // Modals
+  modalBackdrop: { flex: 1 },
 });

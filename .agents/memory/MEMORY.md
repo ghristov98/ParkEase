@@ -1,3 +1,4 @@
 - [ParkEase API hook patterns](parkease-api-hooks.md) — generated API has NO useGetXxx query hooks; use useQuery(getGetXxxQueryOptions()) pattern instead
 - [ParkEase project overview](parkease-overview.md) — stack, credentials, key decisions
 - [Ghost React packages from npm sandbox installs](ghost-react-packages.md) — npm install at workspace root creates ghost React copies Metro picks up → duplicate React → hook errors
+- [ParkEase map architecture](parkease-map-architecture.md) — SVG markers, animated bottom sheet, zone pulse, custom controls — key patterns and gotchas
