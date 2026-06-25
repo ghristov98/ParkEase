@@ -5,7 +5,6 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
-import { Feather, Ionicons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -19,11 +18,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, staleTime: 30_000 },
-  },
-});
+const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
@@ -31,10 +26,10 @@ function RootLayoutNav() {
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(main)" />
-      <Stack.Screen name="parking/[id]" />
-      <Stack.Screen name="vehicle/add" />
-      <Stack.Screen name="vehicle/[id]" />
       <Stack.Screen name="admin" />
+      <Stack.Screen name="parking/[id]" />
+      <Stack.Screen name="vehicle/[id]" />
+      <Stack.Screen name="vehicle/add" />
     </Stack>
   );
 }
@@ -45,8 +40,6 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
-    ...Ionicons.font,
-    ...Feather.font,
   });
 
   useEffect(() => {
