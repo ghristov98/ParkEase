@@ -1,0 +1,86 @@
+1. Map — Show Only Zones by Default
+
+When the Map page loads, show only the zone polygons (Blue and Green) by default
+All other layers (parking machines, paid spots, free spots, penalty markers) must be off by default
+The user activates additional layers through the filter menu
+Zone polygons must load fast — if polygon data is heavy, memoize it with useMemo so it never re-renders unless the data actually changes
+Do not re-render the entire map component when filters change — only re-evaluate the relevant marker and polygon layers
+
+
+2. Filter Menu — Position & Design
+
+Place the filter menu button in the bottom-left corner of the map screen, just above the bottom navigation bar
+It must be a compact floating button (not a full toolbar) — use a SlidersHorizontal icon with a short "Filter" label next to it
+Tapping it opens a bottom sheet that slides up smoothly from the bottom of the screen (300ms ease transition)
+The bottom sheet contains filter toggles:
+
+🔵 Blue Zone (on by default)
+🟢 Green Zone (on by default)
+🅿️ Parking Machines (off by default)
+💳 Paid Parking (off by default)
+🆓 Free Parking (off by default)
+🚫 Penalty Markers (super admin only, off by default)
+
+
+Each toggle must apply instantly to the map with no reload and no lag
+The bottom sheet can be dismissed by swiping down or tapping outside it
+If any non-default filter is active, show a small colored dot on the filter button so the user knows filters are applied
+
+
+3. Performance — No Lag Anywhere in the App
+Apply these optimisations across the entire app:
+React optimisations:
+
+Wrap all map marker components in React.memo so they do not re-render unless their own props change
+Use useCallback on all event handler functions passed as props
+Use useMemo on all derived data — filtered marker lists, zone polygon arrays, session calculations, dashboard stats
+Audit the whole app for any useEffect with missing or incorrect dependency arrays and fix them — these are the most common cause of unnecessary re-renders
+
+Map specific:
+
+Use marker clustering (@googlemaps/markerclusterer or equivalent) so the map stays smooth even with many markers
+Lazy load marker data — do not fetch all markers on app start, only fetch what is needed for the current map view or city
+Debounce map movement events (onBoundsChanged, onZoom) with a 300ms delay before triggering any data fetch or filter recalculation
+
+General app:
+
+Lazy load every page/route using React.lazy and Suspense so the initial bundle is small and pages load on demand
+All images and icons must be optimised — use SVG for markers and icons, never large PNG files
+Remove any console.log statements left in production code — they slow down the browser
+If any list renders more than 20 items (parking history, notifications), implement virtual scrolling or pagination so the DOM stays light
+
+
+4. Loading Animation — App Start & Page Transitions
+App Start (Splash Screen):
+
+On cold start, show a full-screen splash with the app logo centered
+Animate the logo: starts small and slightly transparent, scales up to full size and full opacity over 600ms (ease-out)
+Below the logo, show a parking-themed animation — a small car SVG that drives in from the left and parks into a spot, then a subtle "P" icon fades in above it
+The whole splash lasts a maximum of 2.5 seconds, then fades out into the app
+Only show on cold start — never between page navigations
+
+Page Transition:
+
+Between every page navigation, run a fade + slight upward slide transition on the incoming page:
+
+Incoming page starts at opacity: 0 and translateY: 12px
+Animates to opacity: 1 and translateY: 0 over 250ms ease-out
+
+
+Outgoing page fades out simultaneously over 200ms
+Add a thin progress bar at the very top of the screen that sweeps across during navigation (like YouTube / GitHub style) — brand primary color
+These transitions must feel instant and smooth — if any transition causes lag, reduce duration or simplify the easing
+
+Skeleton Screens:
+
+While any page content is loading (vehicles list, notifications, dashboard stats), show animated skeleton placeholders that match the exact shape of the real content
+Grey background with a shimmer animation sweeping left to right
+Never show a blank page or a full-screen spinner
+
+
+5. General Requirements
+
+Do not break any existing functionality
+Fully responsive — all changes must work on both mobile and desktop
+All animations via CSS transitions or keyframes only — do not install new animation libraries
+Ask for existing files before touching map, auth, roles, or data models

@@ -2,7 +2,7 @@
 import { getGetNotificationsQueryOptions, useMarkAllNotificationsRead, useMarkNotificationRead } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Clock, Info, Tag } from "lucide-react-native";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -29,6 +29,7 @@ function getTypeIcon(type: string): LucideIcon {
 export default function NotificationsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: notificationsData, isLoading, refetch } = useQuery(getGetNotificationsQueryOptions());
   const markAsReadMutation = useMarkNotificationRead();
   const markAllAsReadMutation = useMarkAllNotificationsRead();
@@ -36,6 +37,12 @@ export default function NotificationsScreen() {
   if (isLoading) return <LoadingScreen />;
 
   const notifications = notificationsData?.notifications || [];
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+  }, [refetch]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -86,7 +93,7 @@ export default function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />
         }
         renderItem={({ item }) => {
           const TypeIcon = getTypeIcon(item.type);
@@ -127,12 +134,10 @@ export default function NotificationsScreen() {
         }}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
-              <Bell size={40} color={colors.mutedForeground} strokeWidth={1.5} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No notifications</Text>
+            <Bell size={72} color={colors.mutedForeground} strokeWidth={1} style={{ opacity: 0.25, marginBottom: 20 }} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>You're all caught up</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              We'll notify you when there's an update about your vehicles or parking.
+              We'll let you know when there's an update about your vehicles or parking.
             </Text>
           </View>
         }

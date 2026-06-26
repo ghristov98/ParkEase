@@ -2,7 +2,7 @@ import { getGetVehiclesQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Car, ChevronRight, MapPin, Plus, PlusCircle } from "lucide-react-native";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   FlatList,
   Image,
@@ -24,7 +24,14 @@ export default function VehiclesScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: vehicles, isLoading, refetch } = useQuery(getGetVehiclesQueryOptions());
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+  }, [refetch]);
 
   if (isLoading) return <LoadingScreen />;
 
@@ -39,7 +46,7 @@ export default function VehiclesScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />
         }
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => router.push(`/vehicle/${item.id}`)}>
@@ -72,10 +79,8 @@ export default function VehiclesScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
-              <Car size={44} color={colors.mutedForeground} strokeWidth={1.5} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No vehicles added</Text>
+            <Car size={72} color={colors.mutedForeground} strokeWidth={1} style={{ opacity: 0.25, marginBottom: 20 }} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>You haven't added a vehicle yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
               Add your first vehicle to start tracking and managing it.
             </Text>

@@ -82,12 +82,6 @@ interface CityConfig {
 
 const CITIES: CityConfig[] = [
   {
-    id: "full",
-    label: "Full Map",
-    center: { latitude: 42.7339, longitude: 25.4858 },
-    delta: { latitudeDelta: 5.0, longitudeDelta: 5.0 },
-  },
-  {
     id: "burgas",
     label: "Burgas",
     center: { latitude: 42.495278, longitude: 27.471667 },

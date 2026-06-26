@@ -10,11 +10,12 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Camera, ChevronLeft, MapPin, Pencil, Trash2, X } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   FlatList,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,8 +40,15 @@ export default function VehicleDetails() {
   const { accessToken } = useAuth();
   const { showSuccess, showError, showWarning, showConfirm } = useToast();
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: vehicle, isLoading, refetch } = useQuery(getGetVehicleByIdQueryOptions(id!));
-  const { data: history } = useQuery(getGetVehicleHistoryQueryOptions(id!));
+  const { data: history, refetch: refetchHistory } = useQuery(getGetVehicleHistoryQueryOptions(id!));
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await Promise.all([refetch(), refetchHistory()]);
+    setIsRefreshing(false);
+  }, [refetch, refetchHistory]);
   
   const updateVehicleMutation = useUpdateVehicle();
   const deleteVehicleMutation = useDeleteVehicle();
@@ -173,7 +181,12 @@ export default function VehicleDetails() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor="#0E4BF1" colors={["#0E4BF1"]} />
+        }
+      >
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <Pressable
@@ -292,9 +305,9 @@ export default function VehicleDetails() {
           </Card>
 
           {/* History */}
-          {history && history.length > 0 && (
-            <Card style={styles.card}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Parking History</Text>
+          <Card style={styles.card}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Parking History</Text>
+            {history && history.length > 0 ? (
               <FlatList
                 data={history.slice(0, 5)}
                 keyExtractor={(item: any) => item.id}
@@ -310,8 +323,14 @@ export default function VehicleDetails() {
                   </View>
                 )}
               />
-            </Card>
-          )}
+            ) : (
+              <View style={styles.historyEmpty}>
+                <Text style={[styles.historyEmptyText, { color: colors.mutedForeground }]}>
+                  No parking history yet for this vehicle.
+                </Text>
+              </View>
+            )}
+          </Card>
         </View>
       </ScrollView>
     </View>
@@ -400,4 +419,6 @@ const styles = StyleSheet.create({
   },
   historyLot: { fontSize: 14, fontWeight: "600" },
   historyDate: { fontSize: 12 },
+  historyEmpty: { paddingVertical: 16, alignItems: "center" },
+  historyEmptyText: { fontSize: 14, textAlign: "center" },
 });

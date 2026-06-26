@@ -2,7 +2,7 @@
 import { useUpdateProfile } from "@workspace/api-client-react";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { Camera, ChevronRight, LogOut, Mail, Phone, Shield } from "lucide-react-native";
+import { Camera, ChevronRight, Clock, Heart, LogOut, Mail, Phone, Shield } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Image,
@@ -192,6 +192,33 @@ export default function ProfileScreen() {
           )}
         </Card>
 
+        <Card style={[styles.section, { marginBottom: 20 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 12 }]}>Quick Links</Text>
+          <TouchableOpacity
+            style={styles.quickLink}
+            onPress={() => router.push("/history")}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.quickLinkIcon, { backgroundColor: colors.primary + "15" }]}>
+              <Clock size={18} color={colors.primary} strokeWidth={2} />
+            </View>
+            <Text style={[styles.quickLinkText, { color: colors.foreground }]}>Parking History</Text>
+            <ChevronRight size={18} color={colors.mutedForeground} strokeWidth={2} />
+          </TouchableOpacity>
+          <View style={[styles.quickLinkDivider, { backgroundColor: colors.border }]} />
+          <TouchableOpacity
+            style={styles.quickLink}
+            onPress={() => router.push("/favourites")}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.quickLinkIcon, { backgroundColor: "#EF444415" }]}>
+              <Heart size={18} color="#EF4444" strokeWidth={2} />
+            </View>
+            <Text style={[styles.quickLinkText, { color: colors.foreground }]}>Favourite Spots</Text>
+            <ChevronRight size={18} color={colors.mutedForeground} strokeWidth={2} />
+          </TouchableOpacity>
+        </Card>
+
         <SessionTimerCard />
 
         <LoyaltyPointsCard initialPoints={120} />
@@ -345,5 +372,28 @@ const styles = StyleSheet.create({
   signOutButton: {
     marginTop: 8,
     borderColor: "#EF4444",
+  },
+  quickLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  quickLinkIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickLinkText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  quickLinkDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 8,
+    marginLeft: 48,
   },
 });

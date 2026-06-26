@@ -11,8 +11,10 @@ import { useColors } from "@/hooks/useColors";
 import { getGetUnreadNotificationCountQueryOptions } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 
+const BADGE_QUERY_OPTS = { refetchInterval: 30_000 };
+
 const UnreadBadge = React.memo(function UnreadBadge({ color: _color }: { color: string }) {
-  const { data } = useQuery(getGetUnreadNotificationCountQueryOptions());
+  const { data } = useQuery({ ...getGetUnreadNotificationCountQueryOptions(), ...BADGE_QUERY_OPTS });
   const count = data?.count ?? 0;
   if (!count) return null;
   return (
@@ -29,7 +31,7 @@ const ShakingBell = React.memo(function ShakingBell({
   focused: boolean;
   color: string;
 }) {
-  const { data } = useQuery(getGetUnreadNotificationCountQueryOptions());
+  const { data } = useQuery({ ...getGetUnreadNotificationCountQueryOptions(), ...BADGE_QUERY_OPTS });
   const count = data?.count ?? 0;
   const prevCountRef = useRef(count);
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -91,6 +93,8 @@ function ClassicTabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
+  const { data: unreadData } = useQuery({ ...getGetUnreadNotificationCountQueryOptions(), ...BADGE_QUERY_OPTS });
+  const unreadCount = unreadData?.count ?? 0;
 
   const screenOptions = useMemo(() => ({
     tabBarActiveTintColor: colors.primary,
@@ -165,6 +169,7 @@ function ClassicTabLayout() {
         name="notifications"
         options={{
           title: "Alerts",
+          tabBarBadge: isIOS && unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
           tabBarIcon: ({ focused, color }) =>
             isIOS ? (
               <SymbolView
