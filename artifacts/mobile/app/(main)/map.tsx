@@ -94,17 +94,21 @@ const CITIES: CityConfig[] = [
 // ---------------------------------------------------------------------------
 
 interface FilterState {
-  zones: boolean;
+  blueZone: boolean;
+  greenZone: boolean;
+  parkingMachines: boolean;
   freeParking: boolean;
   paidParking: boolean;
   penaltyParking: boolean;
 }
 
 const DEFAULT_FILTERS: FilterState = {
-  zones: true,
-  freeParking: true,
-  paidParking: true,
-  penaltyParking: true,
+  blueZone: true,
+  greenZone: true,
+  parkingMachines: false,
+  freeParking: false,
+  paidParking: false,
+  penaltyParking: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -595,8 +599,10 @@ export default function MapScreen() {
   // ---------------------------------------------------------------------------
 
   const filteredZones = useMemo(
-    () => (filters.zones ? ZONE_POLYGONS : []),
-    [filters.zones]
+    () => ZONE_POLYGONS.filter(
+      (z) => (z.type === "blue" && filters.blueZone) || (z.type === "green" && filters.greenZone)
+    ),
+    [filters.blueZone, filters.greenZone]
   );
 
   const filteredMachines = useMemo(() => {
@@ -611,8 +617,8 @@ export default function MapScreen() {
           ) <= 500
       );
     }
-    return filters.paidParking ? PARKING_MACHINES : [];
-  }, [filters.paidParking, nearbyMachinesCoord]);
+    return filters.parkingMachines ? PARKING_MACHINES : [];
+  }, [filters.parkingMachines, nearbyMachinesCoord]);
 
   const filteredParkingLots = useMemo(() => {
     const lots = (parkingLots ?? []) as any[];
@@ -643,6 +649,17 @@ export default function MapScreen() {
   const filteredPenaltyMarkers = useMemo(
     () => (isSuperAdmin && filters.penaltyParking ? penaltyMarkers : []),
     [isSuperAdmin, filters.penaltyParking, penaltyMarkers]
+  );
+
+  const hasActiveFilters = useMemo(
+    () =>
+      !filters.blueZone ||
+      !filters.greenZone ||
+      filters.parkingMachines ||
+      filters.freeParking ||
+      filters.paidParking ||
+      (isSuperAdmin && filters.penaltyParking),
+    [filters, isSuperAdmin]
   );
 
   // ---------------------------------------------------------------------------
@@ -1140,132 +1157,124 @@ export default function MapScreen() {
             leftIcon={Search}
             style={[styles.searchInput, { flex: 1 }]}
           />
-          <Pressable
-            style={({ pressed }) => [
-              styles.filterBtn,
-              {
-                backgroundColor: filterOpen
-                  ? colors.primary + "18"
-                  : colors.card,
-                borderColor: filterOpen ? colors.primary : colors.border,
-                opacity: pressed ? 0.8 : 1,
-                transform: [{ scale: pressed ? 0.95 : 1 }],
-              },
-            ]}
-            onPress={() => setFilterOpen((v) => !v)}
-          >
-            <SlidersHorizontal
-              size={20}
-              color={filterOpen ? colors.primary : colors.mutedForeground}
-              strokeWidth={2}
-            />
-          </Pressable>
         </View>
 
-        {/* City selector segmented control */}
-        <View style={[styles.citySelector, { backgroundColor: colors.card }]}>
-          {CITIES.map((city) => (
-            <TouchableOpacity
-              key={city.id}
-              style={[
-                styles.citySegment,
-                selectedCity === city.id && { backgroundColor: colors.primary },
-              ]}
-              onPress={() => handleCityChange(city.id)}
-              activeOpacity={0.7}
-            >
-              <Text
+        {/* City selector — only shown when multiple cities available */}
+        {CITIES.length > 1 && (
+          <View style={[styles.citySelector, { backgroundColor: colors.card }]}>
+            {CITIES.map((city) => (
+              <TouchableOpacity
+                key={city.id}
                 style={[
-                  styles.citySegmentText,
-                  { color: selectedCity === city.id ? "#FFF" : colors.foreground },
+                  styles.citySegment,
+                  selectedCity === city.id && { backgroundColor: colors.primary },
                 ]}
+                onPress={() => handleCityChange(city.id)}
+                activeOpacity={0.7}
               >
-                {city.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Text
+                  style={[
+                    styles.citySegmentText,
+                    { color: selectedCity === city.id ? "#FFF" : colors.foreground },
+                  ]}
+                >
+                  {city.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* -------------------------------------------------------------------- */}
-      {/* Filter panel — animated slide-in                                      */}
+      {/* Filter sheet — backdrop + animated bottom sheet                      */}
       {/* -------------------------------------------------------------------- */}
+
+      {filterOpen && (
+        <Pressable
+          style={styles.filterOverlay}
+          onPress={() => setFilterOpen(false)}
+        />
+      )}
 
       <Animated.View
         style={[
           styles.filterPanel,
           {
-            top: insets.top + 122,
             transform: [
               {
-                translateX: filterAnim.interpolate({
+                translateY: filterAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [320, 0],
+                  outputRange: [440, 0],
                 }),
               },
             ],
-            opacity: filterAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 1],
-            }),
           },
         ]}
         pointerEvents={filterOpen ? "auto" : "none"}
       >
-        <Card padding={false}>
-          <View style={styles.filterPanelInner}>
-            <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>
-              Filters
-            </Text>
-            <FilterToggle
-              label="🔵🟢 Zones"
-              active={filters.zones}
-              onPress={() => toggleFilter("zones")}
-            />
-            <FilterToggle
-              label="🆓 Free Parking"
-              active={filters.freeParking}
-              onPress={() => toggleFilter("freeParking")}
-            />
-            <FilterToggle
-              label="💳 Paid Parking"
-              active={filters.paidParking}
-              onPress={() => toggleFilter("paidParking")}
-            />
-            {isSuperAdmin && (
-              <>
-                <View
-                  style={[styles.filterDivider, { backgroundColor: colors.border }]}
-                />
-                <FilterToggle
-                  label="🚫 Penalty Parking"
-                  active={filters.penaltyParking}
-                  onPress={() => toggleFilter("penaltyParking")}
-                />
-                <TouchableOpacity
+        <View style={[styles.filterPanelInner, { backgroundColor: colors.card, paddingBottom: insets.bottom + 12 }]}>
+          <View style={[styles.filterHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>
+            Map Filters
+          </Text>
+          <FilterToggle
+            label="🔵 Blue Zone"
+            active={filters.blueZone}
+            onPress={() => toggleFilter("blueZone")}
+          />
+          <FilterToggle
+            label="🟢 Green Zone"
+            active={filters.greenZone}
+            onPress={() => toggleFilter("greenZone")}
+          />
+          <View style={[styles.filterDivider, { backgroundColor: colors.border }]} />
+          <FilterToggle
+            label="🅿️ Parking Machines"
+            active={filters.parkingMachines}
+            onPress={() => toggleFilter("parkingMachines")}
+          />
+          <FilterToggle
+            label="💳 Paid Parking"
+            active={filters.paidParking}
+            onPress={() => toggleFilter("paidParking")}
+          />
+          <FilterToggle
+            label="🆓 Free Parking"
+            active={filters.freeParking}
+            onPress={() => toggleFilter("freeParking")}
+          />
+          {isSuperAdmin && (
+            <>
+              <View style={[styles.filterDivider, { backgroundColor: colors.border }]} />
+              <FilterToggle
+                label="🚫 Penalty Markers"
+                active={filters.penaltyParking}
+                onPress={() => toggleFilter("penaltyParking")}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.penaltyModeBtn,
+                  {
+                    borderColor: penaltyMode ? "#EF4444" : colors.border,
+                    backgroundColor: penaltyMode ? "#FEF2F2" : colors.muted,
+                  },
+                ]}
+                onPress={() => setPenaltyMode((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <Text
                   style={[
-                    styles.penaltyModeBtn,
-                    {
-                      borderColor: penaltyMode ? "#EF4444" : colors.border,
-                      backgroundColor: penaltyMode ? "#FEF2F2" : colors.muted,
-                    },
+                    styles.penaltyModeText,
+                    { color: penaltyMode ? "#DC2626" : colors.foreground },
                   ]}
-                  onPress={() => setPenaltyMode((v) => !v)}
-                  activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.penaltyModeText,
-                      { color: penaltyMode ? "#DC2626" : colors.foreground },
-                    ]}
-                  >
-                    {penaltyMode ? "⚠️ Penalty Mode ON" : "Place Penalty Marker"}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </Card>
+                  {penaltyMode ? "⚠️ Penalty Mode ON" : "Place Penalty Marker"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </Animated.View>
 
       {/* -------------------------------------------------------------------- */}
@@ -1425,6 +1434,36 @@ export default function MapScreen() {
           <PlayCircle size={26} color="white" strokeWidth={2} />
         </Pressable>
       )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* Filter FAB — bottom left                                             */}
+      {/* -------------------------------------------------------------------- */}
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.filterFab,
+          {
+            bottom: 100 + insets.bottom,
+            backgroundColor: filterOpen ? colors.primary : colors.card,
+            borderColor: filterOpen ? colors.primary : colors.border,
+            opacity: pressed ? 0.88 : 1,
+            transform: [{ scale: pressed ? 0.95 : 1 }],
+          },
+        ]}
+        onPress={() => setFilterOpen((v) => !v)}
+      >
+        <SlidersHorizontal
+          size={18}
+          color={filterOpen ? "white" : colors.foreground}
+          strokeWidth={2}
+        />
+        <Text style={[styles.filterFabLabel, { color: filterOpen ? "white" : colors.foreground }]}>
+          Filter
+        </Text>
+        {hasActiveFilters && !filterOpen && (
+          <View style={styles.filterActiveDot} />
+        )}
+      </Pressable>
 
       {/* -------------------------------------------------------------------- */}
       {/* Custom bottom sheet info panel                                        */}
