@@ -12,7 +12,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Camera, ChevronLeft, MapPin, Pencil, Trash2, X } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  Alert,
   FlatList,
   Image,
   Pressable,
@@ -30,6 +29,7 @@ import { Input } from "@/components/ui/Input";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function VehicleDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,6 +37,7 @@ export default function VehicleDetails() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { accessToken } = useAuth();
+  const { showSuccess, showError, showWarning, showConfirm } = useToast();
 
   const { data: vehicle, isLoading, refetch } = useQuery(getGetVehicleByIdQueryOptions(id!));
   const { data: history } = useQuery(getGetVehicleHistoryQueryOptions(id!));
@@ -82,39 +83,35 @@ export default function VehicleDetails() {
       });
       setIsEditing(false);
       refetch();
-      Alert.alert("Success", "Vehicle updated successfully");
+      showSuccess("Vehicle updated successfully");
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Update failed");
+      showError(err.message || "Update failed");
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Delete Vehicle",
-      "Are you sure you want to remove this vehicle?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteVehicleMutation.mutateAsync({ id: vehicle.id });
-              router.back();
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Delete failed");
-            }
-          },
-        },
-      ]
-    );
+    showConfirm({
+      title: "Delete Vehicle",
+      message: "Are you sure you want to remove this vehicle?",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteVehicleMutation.mutateAsync({ id: vehicle.id });
+          router.back();
+        } catch (err: any) {
+          showError(err.message || "Delete failed");
+        }
+      },
+    });
   };
 
   const updateLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission denied", "We need location permission to update vehicle position");
+        showWarning("We need location permission to update vehicle position");
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
@@ -126,9 +123,9 @@ export default function VehicleDetails() {
         },
       });
       refetch();
-      Alert.alert("Success", "Location updated to current position");
-    } catch (err) {
-      Alert.alert("Error", "Failed to update location");
+      showSuccess("Location updated to current position");
+    } catch {
+      showError("Failed to update location");
     }
   };
 
@@ -165,8 +162,8 @@ export default function VehicleDetails() {
 
       if (!resp.ok) throw new Error("Upload failed");
       refetch();
-    } catch (err) {
-      Alert.alert("Error", "Failed to upload photo");
+    } catch {
+      showError("Failed to upload photo");
     }
   };
 
@@ -177,123 +174,144 @@ export default function VehicleDetails() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        <View style={styles.imageContainer}>
-          {vehicle.photoUrl ? (
-            <Image source={{ uri: vehicle.photoUrl }} style={styles.photo} />
-          ) : (
-            <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Text style={styles.carEmoji}>🚗</Text>
-            </View>
-          )}
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <Pressable
-            style={({ pressed }) => [
-              styles.backButton,
-              { top: insets.top + 10, opacity: pressed ? 0.8 : 1 },
-            ]}
             onPress={() => router.back()}
+            style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <ChevronLeft size={24} color="white" strokeWidth={2.5} />
+            <ChevronLeft size={24} color={colors.foreground} strokeWidth={2.5} />
           </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.cameraIcon,
-              { opacity: pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
-            ]}
-            onPress={changePhoto}
-          >
-            <Camera size={20} color="white" strokeWidth={2} />
-          </Pressable>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+            {vehicle.name}
+          </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => setIsEditing(!isEditing)}
+              style={[styles.iconBtn, { backgroundColor: colors.muted }]}
+            >
+              {isEditing
+                ? <X size={18} color={colors.foreground} strokeWidth={2.5} />
+                : <Pencil size={18} color={colors.foreground} strokeWidth={2.5} />
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDelete}
+              style={[styles.iconBtn, { backgroundColor: "#FEF2F2" }]}
+            >
+              <Trash2 size={18} color="#EF4444" strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.content}>
-          <Card style={styles.mainInfo}>
-            <View style={styles.headerRow}>
-              <View>
-                <Text style={[styles.name, { color: colors.foreground }]}>{vehicle.name}</Text>
-                <Text style={[styles.plate, { color: colors.primary }]}>{vehicle.licensePlate}</Text>
-              </View>
-              <Pressable
-                onPress={() => setIsEditing(!isEditing)}
-                style={({ pressed }) => [
-                  styles.editButton,
-                  { backgroundColor: colors.primary + "15", opacity: pressed ? 0.75 : 1 },
-                ]}
-              >
-                {isEditing
-                  ? <X size={18} color={colors.primary} strokeWidth={2.5} />
-                  : <Pencil size={18} color={colors.primary} strokeWidth={2} />
-                }
-              </Pressable>
+        {/* Photo */}
+        {vehicle.photoUrl ? (
+          <Pressable onPress={changePhoto} style={styles.photoWrap}>
+            <Image source={{ uri: vehicle.photoUrl }} style={styles.photo} resizeMode="cover" />
+            <View style={styles.photoOverlay}>
+              <Camera size={20} color="white" strokeWidth={2} />
             </View>
+          </Pressable>
+        ) : (
+          <Pressable onPress={changePhoto} style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
+            <Camera size={32} color={colors.mutedForeground} strokeWidth={1.5} />
+            <Text style={[styles.addPhotoText, { color: colors.mutedForeground }]}>Add Photo</Text>
+          </Pressable>
+        )}
 
-            {isEditing ? (
-              <View style={styles.form}>
-                <Input label="Name" value={form.name} onChangeText={(t) => setForm({...form, name: t})} />
-                <Input label="Plate" value={form.licensePlate} onChangeText={(t) => setForm({...form, licensePlate: t})} />
+        <View style={styles.content}>
+          {isEditing ? (
+            <Card style={styles.card}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Edit Vehicle</Text>
+              <View style={styles.formGap}>
+                <Input label="Name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} />
+                <Input label="License Plate" value={form.licensePlate} onChangeText={(t) => setForm({ ...form, licensePlate: t.toUpperCase() })} autoCapitalize="characters" />
                 <View style={styles.row}>
-                  <View style={{flex:1}}><Input label="Brand" value={form.brand} onChangeText={(t) => setForm({...form, brand: t})} /></View>
-                  <View style={{width:12}} />
-                  <View style={{flex:1}}><Input label="Model" value={form.model} onChangeText={(t) => setForm({...form, model: t})} /></View>
+                  <View style={{ flex: 1 }}>
+                    <Input label="Brand" value={form.brand} onChangeText={(t) => setForm({ ...form, brand: t })} />
+                  </View>
+                  <View style={{ width: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Input label="Model" value={form.model} onChangeText={(t) => setForm({ ...form, model: t })} />
+                  </View>
+                </View>
+                <View style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Input label="Year" value={form.year} onChangeText={(t) => setForm({ ...form, year: t })} keyboardType="numeric" />
+                  </View>
+                  <View style={{ width: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Input label="Color" value={form.color} onChangeText={(t) => setForm({ ...form, color: t })} />
+                  </View>
                 </View>
                 <Button title="Save Changes" onPress={handleUpdate} loading={updateVehicleMutation.isPending} fullWidth />
               </View>
-            ) : (
-              <View style={styles.detailsGrid}>
-                <View style={styles.detailItem}>
-                  <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Brand</Text>
-                  <Text style={[styles.detailValue, { color: colors.foreground }]}>{vehicle.brand}</Text>
+            </Card>
+          ) : (
+            <Card style={styles.card}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Vehicle Info</Text>
+              {[
+                ["License Plate", vehicle.licensePlate],
+                ["Brand", vehicle.brand],
+                ["Model", vehicle.model],
+                ["Year", vehicle.year.toString()],
+                ["Color", vehicle.color],
+              ].map(([label, value]) => (
+                <View key={label} style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>{label}</Text>
+                  <Text style={[styles.infoValue, { color: colors.foreground }]}>{value}</Text>
                 </View>
-                <View style={styles.detailItem}>
-                  <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Model</Text>
-                  <Text style={[styles.detailValue, { color: colors.foreground }]}>{vehicle.model}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Year</Text>
-                  <Text style={[styles.detailValue, { color: colors.foreground }]}>{vehicle.year}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>Color</Text>
-                  <Text style={[styles.detailValue, { color: colors.foreground }]}>{vehicle.color}</Text>
-                </View>
+              ))}
+            </Card>
+          )}
+
+          {/* Location */}
+          <Card style={styles.card}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Location</Text>
+            {vehicle.latitude != null && vehicle.longitude != null ? (
+              <View style={styles.locationRow}>
+                <MapPin size={16} color={colors.primary} strokeWidth={2} />
+                <Text style={[styles.locationText, { color: colors.mutedForeground }]}>
+                  {vehicle.latitude.toFixed(5)}, {vehicle.longitude.toFixed(5)}
+                </Text>
               </View>
+            ) : (
+              <Text style={[styles.noLocation, { color: colors.mutedForeground }]}>
+                No location set
+              </Text>
             )}
+            <Button
+              title="Update to Current Location"
+              icon={MapPin}
+              onPress={updateLocation}
+              loading={updateLocationMutation.isPending}
+              variant="outline"
+              fullWidth
+              style={{ marginTop: 12 }}
+            />
           </Card>
 
-          <Button
-            variant="secondary"
-            title="Update Current Location"
-            onPress={updateLocation}
-            icon={MapPin}
-            fullWidth
-            style={styles.locationButton}
-            loading={updateLocationMutation.isPending}
-          />
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent History</Text>
-            {history?.events.map((event) => (
-              <View key={event.id} style={styles.historyItem}>
-                <View style={[styles.historyDot, { backgroundColor: colors.primary }]} />
-                <View style={styles.historyContent}>
-                  <Text style={[styles.historyType, { color: colors.foreground }]}>{event.eventType.replace(/_/g, ' ')}</Text>
-                  <Text style={[styles.historyDesc, { color: colors.mutedForeground }]}>{event.description}</Text>
-                  <Text style={[styles.historyTime, { color: colors.mutedForeground }]}>{formatDate(event.createdAt)}</Text>
-                </View>
-              </View>
-            ))}
-            {(!history || history.events.length === 0) && (
-              <Text style={{ color: colors.mutedForeground, textAlign: 'center', marginTop: 10 }}>No history available</Text>
-            )}
-          </View>
-
-          <Button
-            variant="destructive"
-            title="Delete Vehicle"
-            onPress={handleDelete}
-            icon={Trash2}
-            fullWidth
-            style={styles.deleteButton}
-          />
+          {/* History */}
+          {history && history.length > 0 && (
+            <Card style={styles.card}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Parking History</Text>
+              <FlatList
+                data={history.slice(0, 5)}
+                keyExtractor={(item: any) => item.id}
+                scrollEnabled={false}
+                renderItem={({ item }: { item: any }) => (
+                  <View style={[styles.historyRow, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.historyLot, { color: colors.foreground }]} numberOfLines={1}>
+                      🅿️ {item.parkingLot?.name ?? "Unknown Lot"}
+                    </Text>
+                    <Text style={[styles.historyDate, { color: colors.mutedForeground }]}>
+                      {formatDate(item.createdAt)}
+                    </Text>
+                  </View>
+                )}
+              />
+            </Card>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -301,139 +319,85 @@ export default function VehicleDetails() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  imageContainer: {
-    height: 250,
-    width: "100%",
-  },
-  photo: {
-    width: "100%",
-    height: "100%",
-  },
-  carEmoji: {
-    fontSize: 56,
-  },
-  photoPlaceholder: {
-    flex: 1,
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
   },
-  backButton: {
-    position: "absolute",
-    left: 16,
+  backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.3)",
     alignItems: "center",
     justifyContent: "center",
   },
-  cameraIcon: {
-    position: "absolute",
-    right: 16,
-    bottom: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
-    padding: 20,
-    marginTop: -20,
-  },
-  mainInfo: {
-    marginBottom: 20,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  name: {
-    fontSize: 22,
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
     fontWeight: "700",
-    marginBottom: 4,
   },
-  plate: {
-    fontSize: 16,
-    fontWeight: "600",
-    textTransform: "uppercase",
+  headerActions: {
+    flexDirection: "row",
+    gap: 8,
   },
-  editButton: {
+  iconBtn: {
     width: 36,
     height: 36,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  detailsGrid: {
+  photoWrap: {
+    height: 200,
+    width: "100%",
+    position: "relative",
+  },
+  photo: {
+    width: "100%",
+    height: 200,
+  },
+  photoOverlay: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoPlaceholder: {
+    height: 140,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  addPhotoText: { fontSize: 14, fontWeight: "500" },
+  content: { padding: 16, gap: 12 },
+  card: { marginBottom: 0 },
+  cardTitle: { fontSize: 16, fontWeight: "700", marginBottom: 14 },
+  formGap: { gap: 12 },
+  row: { flexDirection: "row" },
+  infoRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 20,
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5E7EB",
   },
-  detailItem: {
-    width: "45%",
+  infoLabel: { fontSize: 14 },
+  infoValue: { fontSize: 14, fontWeight: "600" },
+  locationRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+  locationText: { fontSize: 13, flex: 1 },
+  noLocation: { fontSize: 14 },
+  historyRow: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 2,
   },
-  detailLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  detailValue: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  form: {
-    gap: 12,
-  },
-  row: {
-    flexDirection: "row",
-  },
-  locationButton: {
-    marginBottom: 32,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
-  },
-  historyItem: {
-    flexDirection: "row",
-    marginBottom: 20,
-  },
-  historyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 6,
-    marginRight: 16,
-  },
-  historyContent: {
-    flex: 1,
-  },
-  historyType: {
-    fontSize: 16,
-    fontWeight: "600",
-    textTransform: "capitalize",
-    marginBottom: 2,
-  },
-  historyDesc: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  historyTime: {
-    fontSize: 12,
-  },
-  deleteButton: {
-    marginTop: 16,
-  },
+  historyLot: { fontSize: 14, fontWeight: "600" },
+  historyDate: { fontSize: 12 },
 });

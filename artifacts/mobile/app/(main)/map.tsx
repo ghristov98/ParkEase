@@ -29,7 +29,6 @@ import React, {
   useState,
 } from "react";
 import {
-  Alert,
   Animated,
   FlatList,
   Image,
@@ -68,6 +67,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useToast } from "@/contexts/ToastContext";
 
 // ---------------------------------------------------------------------------
 // City config
@@ -448,6 +448,7 @@ export default function MapScreen() {
   const { user, accessToken } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { showError, showInfo, showConfirm } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
   const createMutation = useCreateParkingLot();
@@ -897,7 +898,7 @@ export default function MapScreen() {
       await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
       setLongPressCoord(null);
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to add parking lot");
+      showError(err.message || "Failed to add parking lot");
     } finally {
       setIsSaving(false);
     }
@@ -905,29 +906,25 @@ export default function MapScreen() {
 
   const handleRemovePark = () => {
     if (!nearbyLot) return;
-    Alert.alert(
-      "Remove Parking Lot",
-      `Remove "${nearbyLot.name}" from the map?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            setIsRemoving(true);
-            try {
-              await deleteMutation.mutateAsync({ id: nearbyLot.id });
-              await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
-              setLongPressCoord(null);
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Failed to remove");
-            } finally {
-              setIsRemoving(false);
-            }
-          },
-        },
-      ]
-    );
+    showConfirm({
+      title: "Remove Parking Lot",
+      message: `Remove "${nearbyLot.name}" from the map?`,
+      confirmText: "Remove",
+      cancelText: "Cancel",
+      destructive: true,
+      onConfirm: async () => {
+        setIsRemoving(true);
+        try {
+          await deleteMutation.mutateAsync({ id: nearbyLot.id });
+          await queryClient.invalidateQueries({ queryKey: ["getParkingLots"] });
+          setLongPressCoord(null);
+        } catch (err: any) {
+          showError(err.message || "Failed to remove");
+        } finally {
+          setIsRemoving(false);
+        }
+      },
+    });
   };
 
   const toggleAmenity = (key: AmenityKey) => {
@@ -1427,10 +1424,7 @@ export default function MapScreen() {
             if (selectedLot) {
               router.push(`/parking/${selectedLot.id}`);
             } else {
-              Alert.alert(
-                "Select a Lot",
-                "Tap a parking lot on the map to start a session."
-              );
+              showInfo("Tap a parking lot on the map to start a session.", "Select a Lot");
             }
           }}
         >
@@ -2137,28 +2131,51 @@ function FilterToggle({
   active: boolean;
   onPress: () => void;
 }) {
+  const knobAnim = useRef(new Animated.Value(active ? 16 : 0)).current;
+  const labelOpacity = useRef(new Animated.Value(active ? 1 : 0.45)).current;
+  const trackColor = useRef(new Animated.Value(active ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(knobAnim, {
+      toValue: active ? 16 : 0,
+      useNativeDriver: true,
+      tension: 160,
+      friction: 12,
+    }).start();
+    Animated.timing(labelOpacity, {
+      toValue: active ? 1 : 0.45,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(trackColor, {
+      toValue: active ? 1 : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [active]);
+
+  const trackBg = trackColor.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#D1D5DB", "#3B6BF5"],
+  });
+
   return (
     <TouchableOpacity
       style={styles.filterToggleRow}
       onPress={onPress}
       activeOpacity={0.6}
     >
-      <Text style={[styles.filterToggleLabel, { opacity: active ? 1 : 0.45 }]}>
+      <Animated.Text style={[styles.filterToggleLabel, { opacity: labelOpacity }]}>
         {label}
-      </Text>
-      <View
-        style={[
-          styles.filterToggleSwitch,
-          active && styles.filterToggleSwitchOn,
-        ]}
-      >
-        <View
+      </Animated.Text>
+      <Animated.View style={[styles.filterToggleSwitch, { backgroundColor: trackBg }]}>
+        <Animated.View
           style={[
             styles.filterToggleKnob,
-            active && styles.filterToggleKnobOn,
+            { transform: [{ translateX: knobAnim }] },
           ]}
         />
-      </View>
+      </Animated.View>
     </TouchableOpacity>
   );
 }

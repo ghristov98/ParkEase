@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { Camera, ChevronLeft } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -18,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function AddVehicleScreen() {
   const router = useRouter();
@@ -25,6 +25,7 @@ export default function AddVehicleScreen() {
   const insets = useSafeAreaInsets();
   const { accessToken } = useAuth();
   const createVehicleMutation = useCreateVehicle();
+  const { showError, showWarning } = useToast();
 
   const [form, setForm] = useState({
     name: "",
@@ -51,7 +52,7 @@ export default function AddVehicleScreen() {
 
   const handleSave = async () => {
     if (!form.name || !form.licensePlate || !form.brand || !form.model) {
-      Alert.alert("Error", "Please fill in all required fields");
+      showWarning("Please fill in all required fields");
       return;
     }
 
@@ -69,7 +70,7 @@ export default function AddVehicleScreen() {
 
       router.back();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to add vehicle");
+      showError(err.message || "Failed to add vehicle");
     }
   };
 
@@ -98,155 +99,127 @@ export default function AddVehicleScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Pressable
           onPress={() => router.back()}
-          style={({ pressed }) => [
-            styles.backButton,
-            { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
-          ]}
+          style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.7 : 1 }]}
         >
-          <ChevronLeft size={28} color={colors.foreground} strokeWidth={2} />
+          <ChevronLeft size={24} color={colors.foreground} strokeWidth={2.5} />
         </Pressable>
-        <Text style={[styles.title, { color: colors.foreground }]}>Add Vehicle</Text>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Add Vehicle</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}>
-        <Pressable
-          onPress={pickImage}
-          style={({ pressed }) => [
-            styles.photoPicker,
-            { opacity: pressed ? 0.85 : 1 },
-          ]}
-        >
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Pressable onPress={pickImage} style={styles.photoPickerWrap}>
           {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.photo} />
+            <Image source={{ uri: photoUri }} style={styles.photoPicker} resizeMode="cover" />
           ) : (
-            <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted }]}>
-              <Camera size={36} color={colors.mutedForeground} strokeWidth={1.5} />
-              <Text style={[styles.photoText, { color: colors.mutedForeground }]}>Add Vehicle Photo</Text>
+            <View style={[styles.photoPicker, styles.photoPlaceholder, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Camera size={32} color={colors.mutedForeground} strokeWidth={1.5} />
+              <Text style={[styles.photoPlaceholderText, { color: colors.mutedForeground }]}>
+                Add Photo
+              </Text>
             </View>
           )}
         </Pressable>
 
-        <View style={styles.form}>
-          <Input
-            label="Vehicle Nickname"
-            placeholder="My Cool Car"
-            value={form.name}
-            onChangeText={(text) => setForm({ ...form, name: text })}
-          />
-          <Input
-            label="License Plate"
-            placeholder="ABC-1234"
-            value={form.licensePlate}
-            onChangeText={(text) => setForm({ ...form, licensePlate: text })}
-            autoCapitalize="characters"
-          />
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Input
-                label="Brand"
-                placeholder="Tesla"
-                value={form.brand}
-                onChangeText={(text) => setForm({ ...form, brand: text })}
-              />
-            </View>
-            <View style={{ width: 16 }} />
-            <View style={{ flex: 1 }}>
-              <Input
-                label="Model"
-                placeholder="Model 3"
-                value={form.model}
-                onChangeText={(text) => setForm({ ...form, model: text })}
-              />
-            </View>
+        <Input
+          label="Vehicle Name *"
+          placeholder='e.g. "My Car"'
+          value={form.name}
+          onChangeText={(text) => setForm({ ...form, name: text })}
+        />
+        <Input
+          label="License Plate *"
+          placeholder="A1234BC"
+          value={form.licensePlate}
+          onChangeText={(text) => setForm({ ...form, licensePlate: text.toUpperCase() })}
+          autoCapitalize="characters"
+        />
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Brand *"
+              placeholder="Toyota"
+              value={form.brand}
+              onChangeText={(text) => setForm({ ...form, brand: text })}
+            />
           </View>
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Input
-                label="Year"
-                placeholder="2024"
-                value={form.year}
-                onChangeText={(text) => setForm({ ...form, year: text })}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={{ width: 16 }} />
-            <View style={{ flex: 1 }}>
-              <Input
-                label="Color"
-                placeholder="Midnight Silver"
-                value={form.color}
-                onChangeText={(text) => setForm({ ...form, color: text })}
-              />
-            </View>
+          <View style={{ width: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Model *"
+              placeholder="Corolla"
+              value={form.model}
+              onChangeText={(text) => setForm({ ...form, model: text })}
+            />
           </View>
-
-          <Button
-            title="Save Vehicle"
-            onPress={handleSave}
-            loading={createVehicleMutation.isPending}
-            fullWidth
-            style={styles.saveButton}
-          />
         </View>
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Year"
+              placeholder="2024"
+              value={form.year}
+              onChangeText={(text) => setForm({ ...form, year: text })}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={{ width: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Color"
+              placeholder="White"
+              value={form.color}
+              onChangeText={(text) => setForm({ ...form, color: text })}
+            />
+          </View>
+        </View>
+
+        <Button
+          title="Save Vehicle"
+          onPress={handleSave}
+          loading={createVehicleMutation.isPending}
+          fullWidth
+          style={{ marginTop: 8 }}
+        />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
-  backButton: {
+  backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  content: {
-    padding: 20,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "700" },
+  content: { padding: 20, gap: 12 },
+  photoPickerWrap: { alignItems: "center", marginBottom: 8 },
   photoPicker: {
     width: "100%",
     height: 180,
     borderRadius: 16,
     overflow: "hidden",
-    marginBottom: 24,
-  },
-  photo: {
-    width: "100%",
-    height: "100%",
   },
   photoPlaceholder: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    borderWidth: 2,
+    borderStyle: "dashed",
   },
-  photoText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  form: {
-    width: "100%",
-  },
-  row: {
-    flexDirection: "row",
-  },
-  saveButton: {
-    marginTop: 16,
-  },
+  photoPlaceholderText: { fontSize: 14, fontWeight: "500" },
+  row: { flexDirection: "row" },
 });

@@ -1,7 +1,6 @@
 import { useCreateNotification } from "@workspace/api-client-react";
 import React, { useState } from "react";
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,11 +12,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useColors } from "@/hooks/useColors";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function AdminNotifications() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const createMutation = useCreateNotification();
+  const { showError, showSuccess, showWarning } = useToast();
 
   const [form, setForm] = useState({
     title: "",
@@ -28,7 +29,7 @@ export default function AdminNotifications() {
 
   const handleSend = async () => {
     if (!form.title || !form.body) {
-      Alert.alert("Error", "Title and Body are required");
+      showWarning("Title and Body are required");
       return;
     }
 
@@ -38,13 +39,12 @@ export default function AdminNotifications() {
           title: form.title,
           body: form.body,
           type: form.type,
-          // userIds omitted for "All Users"
         },
       });
-      Alert.alert("Success", "Notification sent to all users");
+      showSuccess("Notification sent to all users");
       setForm({ title: "", body: "", type: "info", isAllUsers: true });
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to send");
+      showError(err.message || "Failed to send");
     }
   };
 

@@ -5,7 +5,6 @@ import { useRouter } from "expo-router";
 import { Camera, ChevronRight, LogOut, Mail, Phone, Shield } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -19,14 +18,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { SessionTimerCard } from "@/components/SessionTimerCard";
+import { LoyaltyPointsCard } from "@/components/LoyaltyPointsCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function ProfileScreen() {
   const { user, logout, updateUser, accessToken } = useAuth();
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { showSuccess, showError } = useToast();
   
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
@@ -44,9 +47,9 @@ export default function ProfileScreen() {
       });
       updateUser(updatedUser);
       setIsEditing(false);
-      Alert.alert("Success", "Profile updated successfully");
+      showSuccess("Profile updated successfully");
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to update profile");
+      showError(err.message || "Failed to update profile");
     }
   };
 
@@ -84,8 +87,8 @@ export default function ProfileScreen() {
       if (!resp.ok) throw new Error("Upload failed");
       const data = await resp.json();
       updateUser({ ...user!, photoUrl: data.url });
-    } catch (err) {
-      Alert.alert("Error", "Failed to upload photo");
+    } catch {
+      showError("Failed to upload photo");
     }
   };
 
@@ -188,6 +191,10 @@ export default function ProfileScreen() {
             </View>
           )}
         </Card>
+
+        <SessionTimerCard />
+
+        <LoyaltyPointsCard initialPoints={120} />
 
         {user?.role === "superadmin" && (
           <TouchableOpacity onPress={() => router.push("/admin")} style={styles.adminCard}>

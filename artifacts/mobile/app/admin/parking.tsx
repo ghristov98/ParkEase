@@ -8,7 +8,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  Alert,
   FlatList,
   Modal,
   ScrollView,
@@ -25,12 +24,14 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useColors } from "@/hooks/useColors";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function AdminParking() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLot, setEditingLot] = useState<any>(null);
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { showError, showConfirm } = useToast();
   
   const { data: parkingLots, isLoading, refetch } = useQuery(getGetParkingLotsQueryOptions());
   const createMutation = useCreateParkingLot();
@@ -93,18 +94,22 @@ export default function AdminParking() {
       setIsModalOpen(false);
       refetch();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Save failed");
+      showError(err.message || "Save failed");
     }
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert("Delete", "Are you sure?", [
-      { text: "Cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
+  const handleDelete = (id: string, name: string) => {
+    showConfirm({
+      title: "Delete Parking Lot",
+      message: `Remove "${name}" from the map?`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      destructive: true,
+      onConfirm: async () => {
         await deleteMutation.mutateAsync({ id });
         refetch();
-      }}
-    ]);
+      },
+    });
   };
 
   if (isLoading) return <LoadingScreen />;
@@ -131,7 +136,7 @@ export default function AdminParking() {
                 <TouchableOpacity onPress={() => handleOpenEdit(item)}>
                   <Text style={[styles.actionEmoji, { color: colors.primary }]}>✏️</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                <TouchableOpacity onPress={() => handleDelete(item.id, item.name)}>
                   <Text style={[styles.actionEmoji, { color: colors.destructive }]}>🗑️</Text>
                 </TouchableOpacity>
               </View>

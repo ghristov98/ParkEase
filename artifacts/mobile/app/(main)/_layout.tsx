@@ -4,8 +4,8 @@ import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Bell, Car, Map, UserCircle } from "lucide-react-native";
-import React, { useMemo } from "react";
-import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
+import React, { useEffect, useMemo, useRef } from "react";
+import { Animated, Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { getGetUnreadNotificationCountQueryOptions } from "@workspace/api-client-react";
@@ -18,6 +18,47 @@ const UnreadBadge = React.memo(function UnreadBadge({ color: _color }: { color: 
   return (
     <View style={[styles.badge, { position: "absolute", top: -6, right: -10 }]}>
       <Text style={styles.badgeText}>{count > 99 ? "99+" : String(count)}</Text>
+    </View>
+  );
+});
+
+const ShakingBell = React.memo(function ShakingBell({
+  focused,
+  color,
+}: {
+  focused: boolean;
+  color: string;
+}) {
+  const { data } = useQuery(getGetUnreadNotificationCountQueryOptions());
+  const count = data?.count ?? 0;
+  const prevCountRef = useRef(count);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (count > prevCountRef.current) {
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue:  9, duration: 55, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -9, duration: 55, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue:  7, duration: 55, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -7, duration: 55, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue:  4, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -4, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue:  0, duration: 40, useNativeDriver: true }),
+      ]).start();
+    }
+    prevCountRef.current = count;
+  }, [count, shakeAnim]);
+
+  return (
+    <View>
+      <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
+        <Bell size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+      </Animated.View>
+      {count > 0 && (
+        <View style={[styles.badge, { position: "absolute", top: -6, right: -10 }]}>
+          <Text style={styles.badgeText}>{count > 99 ? "99+" : String(count)}</Text>
+        </View>
+      )}
     </View>
   );
 });
@@ -132,14 +173,7 @@ function ClassicTabLayout() {
                 size={24}
               />
             ) : (
-              <View>
-                <Bell
-                  size={24}
-                  color={color}
-                  strokeWidth={focused ? 2.5 : 2}
-                />
-                <UnreadBadge color={color} />
-              </View>
+              <ShakingBell focused={focused} color={color} />
             ),
         }}
       />
