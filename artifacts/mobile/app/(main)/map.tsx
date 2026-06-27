@@ -30,6 +30,7 @@ import React, {
 } from "react";
 import {
   Animated,
+  Easing,
   FlatList,
   Image,
   Linking,
@@ -569,11 +570,11 @@ export default function MapScreen() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    Animated.spring(filterAnim, {
+    Animated.timing(filterAnim, {
       toValue: filterOpen ? 1 : 0,
+      duration: 250,
+      easing: Easing.out(Easing.ease),
       useNativeDriver: true,
-      tension: 80,
-      friction: 12,
     }).start();
   }, [filterOpen]);
 
@@ -647,8 +648,8 @@ export default function MapScreen() {
   }, [parkingLots, filters.freeParking, filters.paidParking, selectedCity]);
 
   const filteredPenaltyMarkers = useMemo(
-    () => (isSuperAdmin && filters.penaltyParking ? penaltyMarkers : []),
-    [isSuperAdmin, filters.penaltyParking, penaltyMarkers]
+    () => (filters.penaltyParking ? penaltyMarkers : []),
+    [filters.penaltyParking, penaltyMarkers]
   );
 
   const hasActiveFilters = useMemo(
@@ -658,8 +659,8 @@ export default function MapScreen() {
       filters.parkingMachines ||
       filters.freeParking ||
       filters.paidParking ||
-      (isSuperAdmin && filters.penaltyParking),
-    [filters, isSuperAdmin]
+      filters.penaltyParking,
+    [filters]
   );
 
   // ---------------------------------------------------------------------------
@@ -1187,37 +1188,41 @@ export default function MapScreen() {
       </View>
 
       {/* -------------------------------------------------------------------- */}
-      {/* Filter sheet — backdrop + animated bottom sheet                      */}
+      {/* Filter panel — compact floating card, bottom-right                  */}
       {/* -------------------------------------------------------------------- */}
-
-      {filterOpen && (
-        <Pressable
-          style={styles.filterOverlay}
-          onPress={() => setFilterOpen(false)}
-        />
-      )}
 
       <Animated.View
         style={[
           styles.filterPanel,
           {
+            bottom: 100 + insets.bottom + 56,
             transform: [
               {
                 translateY: filterAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [440, 0],
+                  outputRange: [320, 0],
                 }),
               },
             ],
+            opacity: filterAnim,
           },
         ]}
         pointerEvents={filterOpen ? "auto" : "none"}
       >
-        <View style={[styles.filterPanelInner, { backgroundColor: colors.card, paddingBottom: insets.bottom + 12 }]}>
-          <View style={[styles.filterHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>
-            Map Filters
-          </Text>
+        <View style={[styles.filterPanelInner, { backgroundColor: colors.card }]}>
+          {/* Header */}
+          <View style={styles.filterPanelHeader}>
+            <Text style={[styles.filterPanelTitle, { color: colors.foreground }]}>
+              Map Filters
+            </Text>
+            <Pressable
+              onPress={() => setFilterOpen(false)}
+              style={({ pressed }) => [styles.filterCloseBtn, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <X size={16} color={colors.mutedForeground} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+
           <FilterToggle
             label="🔵 Blue Zone"
             active={filters.blueZone}
@@ -1244,35 +1249,33 @@ export default function MapScreen() {
             active={filters.freeParking}
             onPress={() => toggleFilter("freeParking")}
           />
+          <View style={[styles.filterDivider, { backgroundColor: colors.border }]} />
+          <FilterToggle
+            label="🚫 Penalty Markers"
+            active={filters.penaltyParking}
+            onPress={() => toggleFilter("penaltyParking")}
+          />
           {isSuperAdmin && (
-            <>
-              <View style={[styles.filterDivider, { backgroundColor: colors.border }]} />
-              <FilterToggle
-                label="🚫 Penalty Markers"
-                active={filters.penaltyParking}
-                onPress={() => toggleFilter("penaltyParking")}
-              />
-              <TouchableOpacity
+            <TouchableOpacity
+              style={[
+                styles.penaltyModeBtn,
+                {
+                  borderColor: penaltyMode ? "#EF4444" : colors.border,
+                  backgroundColor: penaltyMode ? "#FEF2F2" : colors.muted,
+                },
+              ]}
+              onPress={() => setPenaltyMode((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text
                 style={[
-                  styles.penaltyModeBtn,
-                  {
-                    borderColor: penaltyMode ? "#EF4444" : colors.border,
-                    backgroundColor: penaltyMode ? "#FEF2F2" : colors.muted,
-                  },
+                  styles.penaltyModeText,
+                  { color: penaltyMode ? "#DC2626" : colors.foreground },
                 ]}
-                onPress={() => setPenaltyMode((v) => !v)}
-                activeOpacity={0.7}
               >
-                <Text
-                  style={[
-                    styles.penaltyModeText,
-                    { color: penaltyMode ? "#DC2626" : colors.foreground },
-                  ]}
-                >
-                  {penaltyMode ? "⚠️ Penalty Mode ON" : "Place Penalty Marker"}
-                </Text>
-              </TouchableOpacity>
-            </>
+                {penaltyMode ? "⚠️ Penalty Mode ON" : "Place Penalty Marker"}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       </Animated.View>
@@ -2275,11 +2278,65 @@ const styles = StyleSheet.create({
   },
   citySegmentText: { fontSize: 13, fontWeight: "600" },
 
-  // Filter panel
-  filterPanel: { position: "absolute", right: 16, width: 220, zIndex: 12 },
-  filterPanelInner: { padding: 14, gap: 2 },
-  filterPanelTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8 },
-  filterDivider: { height: 1, marginVertical: 6 },
+  // Filter panel — compact floating card anchored bottom-right
+  filterPanel: {
+    position: "absolute",
+    right: 16,
+    width: 248,
+    zIndex: 20,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 14,
+  },
+  filterPanelInner: { padding: 14, gap: 2, borderRadius: 16, overflow: "hidden" },
+  filterPanelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  filterPanelTitle: { fontSize: 15, fontWeight: "700" },
+  filterCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterDivider: { height: 1, marginVertical: 4 },
+  // Filter FAB — bottom-right pill button
+  filterFab: {
+    position: "absolute",
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  filterFabLabel: { fontSize: 13, fontWeight: "600" },
+  filterActiveDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#00C5A8",
+    borderWidth: 1.5,
+    borderColor: "white",
+  },
   filterToggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2415,7 +2472,7 @@ const styles = StyleSheet.create({
   // FABs
   adminFab: {
     position: "absolute",
-    right: 16,
+    left: 16,
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -2430,7 +2487,7 @@ const styles = StyleSheet.create({
   },
   sessionFab: {
     position: "absolute",
-    right: 16,
+    left: 16,
     width: 56,
     height: 56,
     borderRadius: 28,

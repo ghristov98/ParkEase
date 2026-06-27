@@ -1,0 +1,41 @@
+1. Filter Menu — Fix Behaviour
+The filter menu is currently always visible on screen. This needs to be changed completely:
+
+The filter menu must be hidden by default
+Add a dedicated filter toggle button — use a SlidersHorizontal icon with a short "Filter" label
+Place the filter button in the bottom-right corner of the map screen, just above the bottom navigation bar
+When the filter button is tapped, the filter panel slides up from the bottom-right as a floating card (not a full bottom sheet — keep it compact so it does not cover the whole screen)
+The filter panel must close when:
+
+The user taps anywhere on the map outside the panel
+The user taps a dedicated X (close) button in the top-right corner of the filter panel
+
+
+Add the X button clearly at the top-right of the filter panel — use the X icon from Lucide
+
+
+2. Filter Menu — Fix Position & Overlap
+Looking at the screenshot, the filter menu is covering other map buttons. Fix this:
+
+Move the filter button and panel to the right side of the screen
+Make sure the filter panel does not overlap any other map controls (zoom buttons, location button, FAB, city selector)
+All buttons on the map must remain fully visible and tappable even when the filter panel is open
+If the filter panel risks overlapping other controls, push those controls to the left side or adjust vertical positioning so everything fits within the screen bounds without collision
+The filter panel itself must fit fully within the screen — no parts cut off on any side
+
+
+3. Penalty Markers — Visible to All Users
+
+Remove the super admin restriction from penalty markers visibility
+All users must be able to see penalty parking markers on the map
+The Penalty Markers toggle in the filter menu must be visible to every user, not just super admin
+Super admin retains the ability to place and manage penalty markers — only the visibility restriction is removed
+Update the filter panel so Penalty Markers appears as a standard toggle for all users
+
+
+4. General Requirements
+
+No lag on filter open/close animation — use CSS transition 250ms ease
+Filter state must persist while the panel is closed — toggling filters, closing the panel, and reopening it must show the same toggle states
+Fully responsive — works correctly on both mobile and desktop
+Do not break any existing map functionality, zones, markers, or navigation
