@@ -37,6 +37,15 @@ app.use("/api/uploads", express.static(uploadDir));
 
 app.use("/api", router);
 
+// Serve the Expo web export (mobile app compiled for web)
+const webDistDir = path.resolve(process.cwd(), "../../artifacts/mobile/dist-web");
+app.use(express.static(webDistDir));
+
+// SPA fallback — send index.html for any non-API route
+app.get("/{*path}", (_req, res) => {
+  res.sendFile(path.join(webDistDir, "index.html"));
+});
+
 // Seed the database on startup
 seedDatabase().catch((err) => logger.error({ err }, "Failed to seed database"));
 
