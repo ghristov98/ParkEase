@@ -39,7 +39,7 @@ app.use("/api", router);
 
 // Serve the Expo web export (mobile app compiled for web)
 const webDistDir = path.resolve(process.cwd(), "../../artifacts/mobile/dist-web");
-app.use(express.static(webDistDir));
+app.use(express.static(webDistDir, { dotfiles: "allow" }));
 
 // SPA fallback — send index.html for any non-API route
 app.get("/{*path}", (_req, res) => {
