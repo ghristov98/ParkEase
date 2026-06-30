@@ -21,13 +21,16 @@ import { Input } from "@/components/ui/Input";
 import { SessionTimerCard } from "@/components/SessionTimerCard";
 import { LoyaltyPointsCard } from "@/components/LoyaltyPointsCard";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { useToast } from "@/contexts/ToastContext";
+import { Globe } from "lucide-react-native";
 
 export default function ProfileScreen() {
   const { user, logout, updateUser, accessToken } = useAuth();
   const router = useRouter();
   const colors = useColors();
+  const { lang, setLang, t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { showSuccess, showError } = useToast();
   
@@ -190,6 +193,41 @@ export default function ProfileScreen() {
               </View>
             </View>
           )}
+        </Card>
+
+        {/* Preferences — language toggle */}
+        <Card style={[styles.section, { marginBottom: 20 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 12 }]}>
+            {t("preferencesSection")}
+          </Text>
+          <View style={profileStyles.prefRow}>
+            <View style={[profileStyles.prefIconWrap, { backgroundColor: colors.primary + "15" }]}>
+              <Globe size={16} color={colors.primary} strokeWidth={2} />
+            </View>
+            <Text style={[profileStyles.prefLabel, { color: colors.foreground }]}>
+              {t("languageLabel")}
+            </Text>
+            <View style={[profileStyles.segControl, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <TouchableOpacity
+                style={[profileStyles.seg, lang === "bg" && { backgroundColor: colors.primary }]}
+                onPress={() => setLang("bg")}
+                activeOpacity={0.7}
+              >
+                <Text style={[profileStyles.segText, { color: lang === "bg" ? "white" : colors.mutedForeground }]}>
+                  🇧🇬 BG
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[profileStyles.seg, lang === "en" && { backgroundColor: colors.primary }]}
+                onPress={() => setLang("en")}
+                activeOpacity={0.7}
+              >
+                <Text style={[profileStyles.segText, { color: lang === "en" ? "white" : colors.mutedForeground }]}>
+                  🇬🇧 EN
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </Card>
 
         <Card style={[styles.section, { marginBottom: 20 }]}>
@@ -395,5 +433,43 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginVertical: 8,
     marginLeft: 48,
+  },
+});
+
+const profileStyles = StyleSheet.create({
+  prefRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  prefIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  prefLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  segControl: {
+    flexDirection: "row",
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 2,
+    gap: 2,
+  },
+  seg: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

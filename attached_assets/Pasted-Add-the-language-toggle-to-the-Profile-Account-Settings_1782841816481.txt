@@ -1,0 +1,53 @@
+Add the language toggle to the Profile / Account Settings page under a "Preferences" / "Предпочитания" section:
+
+Left side: 🌐 globe icon + label "Language / Език"
+Right side: segmented control showing 🇧🇬 Bulgarian and 🇬🇧 English
+Active language is visually highlighted
+
+
+Changing the language applies instantly across the entire app — same behaviour as before, just triggered from the new location
+Language preference must still persist in localStorage or the existing user preferences storage
+Do not break any existing i18n logic
+
+
+3. Add the Official Penalty Marker
+Add this as a single, permanent, fixed marker to municipalParkings.js:
+javascript{
+  id: "penalty_official",
+  name: "Наказателен паркинг",
+  nameEn: "Official Penalty Parking",
+  type: "penalty_official",
+  operator: "Общинско Предприятие Транспорт",
+  lat: 42.500415,
+  lng: 27.474554,
+  permanent: true
+}
+Marker design:
+
+Red circle SVG marker with a white ⚠ icon centered inside
+Slightly larger than the paid parking markers
+Subtle pulsing red glow animation (CSS only)
+White ring border around the circle
+Rendered with the highest zIndex so it always appears above other markers
+
+Behaviour:
+
+Always visible to all users — cannot be hidden by any filter toggle
+Cannot be moved, edited, or deleted by anyone, including super admin
+In the filter panel, show a non-toggleable row with a red dot + label + "Винаги видим / Always visible" badge instead of a switch
+When tapped, open the bottom sheet showing:
+
+⚠️ Name: Наказателен паркинг / Official Penalty Parking
+🏛 Operator: Общинско Предприятие Транспорт
+ℹ️ Info: "Официален общински наказателен паркинг" / "Official municipal impound lot"
+🧭 Navigate button
+
+
+
+
+4. General Requirements
+
+Do not break any existing functionality — map, zones, markers, auth, roles, sessions, filters, navigation
+Both languages (Bulgarian and English) must be supported for all new text via the existing i18n system — no hardcoded strings
+Fully responsive — desktop and mobile
+Ask for these files before touching them: map component, filter panel component, Profile/Settings page component, i18n translation files

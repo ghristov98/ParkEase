@@ -67,8 +67,14 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useColors } from "@/hooks/useColors";
 import { useToast } from "@/contexts/ToastContext";
+import {
+  municipalParkings,
+  OFFICIAL_PENALTY,
+  type MunicipalParking,
+} from "@/data/municipalParkings";
 
 // ---------------------------------------------------------------------------
 // City config
@@ -140,7 +146,9 @@ type SheetItem =
         zoneInfo: ZoneResult;
         coord: { latitude: number; longitude: number };
       };
-    };
+    }
+  | { type: "municipal"; data: MunicipalParking }
+  | { type: "officialPenalty"; data: MunicipalParking };
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -290,6 +298,31 @@ const PenaltyMarkerSvg = React.memo(() => (
   </Svg>
 ));
 
+// Blue rounded-rectangle with white "P" — municipal paid parking
+const MunicipalParkingSvgMarker = React.memo(() => (
+  <Svg width={38} height={45} viewBox="0 0 38 45">
+    <Rect x={2} y={2} width={34} height={34} rx={7} ry={7} fill="#3B5BDB" stroke="#2F4BC4" strokeWidth={2} />
+    <SvgText x={19} y={25} textAnchor="middle" fontSize={19} fontWeight="bold" fill="white">
+      P
+    </SvgText>
+    <SvgPolygon points="14,34 24,34 19,44" fill="#3B5BDB" />
+  </Svg>
+));
+
+// Official penalty — red circle with white ⚠, white ring border
+const OfficialPenaltySvgMarker = React.memo(() => (
+  <Svg width={50} height={50} viewBox="0 0 50 50">
+    {/* outer white ring */}
+    <Circle cx={25} cy={25} r={24} fill="white" />
+    {/* red fill */}
+    <Circle cx={25} cy={25} r={21} fill="#EF4444" />
+    {/* warning symbol */}
+    <SvgText x={25} y={33} textAnchor="middle" fontSize={24} fill="white" fontWeight="bold">
+      ⚠
+    </SvgText>
+  </Svg>
+));
+
 const VehicleSvgMarker = React.memo(({ primaryColor }: { primaryColor: string }) => (
   <Svg width={44} height={44} viewBox="0 0 44 44">
     <Circle cx={22} cy={22} r={20} fill="white" stroke={primaryColor} strokeWidth={2.5} />
@@ -371,6 +404,48 @@ const PenaltyMarkerComponent = React.memo(
   )
 );
 
+const MunicipalParkingMarkerComponent = React.memo(
+  ({ parking, onPress }: { parking: MunicipalParking; onPress: () => void }) => (
+    <Marker
+      coordinate={{ latitude: parking.lat, longitude: parking.lng }}
+      onPress={onPress}
+      anchor={{ x: 0.5, y: 1 }}
+    >
+      <AnimatedDropMarker>
+        <MunicipalParkingSvgMarker />
+      </AnimatedDropMarker>
+    </Marker>
+  )
+);
+
+const OfficialPenaltyMarkerComponent = React.memo(
+  ({ onPress }: { onPress: () => void }) => {
+    const pulseAnim = useRef(new Animated.Value(0.85)).current;
+    useEffect(() => {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.15, duration: 900, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0.85, duration: 900, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }, []);
+    return (
+      <Marker
+        coordinate={{ latitude: OFFICIAL_PENALTY.lat, longitude: OFFICIAL_PENALTY.lng }}
+        onPress={onPress}
+        anchor={{ x: 0.5, y: 0.5 }}
+        zIndex={999}
+      >
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <OfficialPenaltySvgMarker />
+        </Animated.View>
+      </Marker>
+    );
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Main screen
 // ---------------------------------------------------------------------------
@@ -446,6 +521,7 @@ export default function MapScreen() {
 
   const { user, accessToken } = useAuth();
   const colors = useColors();
+  const { t, lang } = useLanguage();
   const insets = useSafeAreaInsets();
   const { showError, showInfo, showConfirm } = useToast();
   const router = useRouter();
@@ -650,6 +726,11 @@ export default function MapScreen() {
   const filteredPenaltyMarkers = useMemo(
     () => (filters.penaltyParking ? penaltyMarkers : []),
     [filters.penaltyParking, penaltyMarkers]
+  );
+
+  const filteredMunicipalParkings = useMemo(
+    () => (filters.paidParking ? municipalParkings : []),
+    [filters.paidParking]
   );
 
   const hasActiveFilters = useMemo(
@@ -1129,7 +1210,21 @@ export default function MapScreen() {
           </Marker>
         ))}
 
-        {/* Penalty markers */}
+        {/* Municipal paid parking markers (shown when paidParking filter is on) */}
+        {filteredMunicipalParkings.map((parking) => (
+          <MunicipalParkingMarkerComponent
+            key={parking.id}
+            parking={parking}
+            onPress={() => openSheet({ type: "municipal", data: parking })}
+          />
+        ))}
+
+        {/* Official penalty parking — always visible, highest zIndex */}
+        <OfficialPenaltyMarkerComponent
+          onPress={() => openSheet({ type: "officialPenalty", data: OFFICIAL_PENALTY })}
+        />
+
+        {/* User-placed penalty markers */}
         {filteredPenaltyMarkers.map((marker) => (
           <PenaltyMarkerComponent
             key={marker.id}
@@ -1255,6 +1350,18 @@ export default function MapScreen() {
             active={filters.penaltyParking}
             onPress={() => toggleFilter("penaltyParking")}
           />
+          {/* Official penalty — always visible, non-toggleable */}
+          <View style={styles.filterToggleRow}>
+            <View style={styles.officialPenaltyFilterRow}>
+              <View style={styles.officialPenaltyDot} />
+              <Text style={[styles.filterToggleLabel, { color: colors.foreground }]}>
+                {t("filterOfficialPenaltyLabel")}
+              </Text>
+            </View>
+            <View style={styles.alwaysVisibleBadge}>
+              <Text style={styles.alwaysVisibleText}>{t("alwaysVisible")}</Text>
+            </View>
+          </View>
           {isSuperAdmin && (
             <TouchableOpacity
               style={[
@@ -1636,6 +1743,116 @@ export default function MapScreen() {
                       </Text>
                     </Pressable>
                   )}
+                </View>
+              </View>
+            )}
+
+            {/* ---- Municipal paid parking sheet ---- */}
+            {sheetItem.type === "municipal" && (
+              <View style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={[styles.sheetName, { color: colors.foreground }]} numberOfLines={2}>
+                    {lang === "bg" ? sheetItem.data.name : sheetItem.data.nameEn}
+                  </Text>
+                  <View style={[styles.zoneBadge, { backgroundColor: "#EEF3FF", borderColor: "rgba(59,91,219,0.35)" }]}>
+                    <Text style={[styles.zoneBadgeText, { color: "#3B5BDB" }]}>
+                      {t("municipalPaidType")}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.sheetInfoRow}>
+                  <View style={styles.sheetInfoChip}>
+                    <Text style={[styles.sheetInfoText, { color: colors.mutedForeground }]}>
+                      🏛 {t("operatorLabel")}: {sheetItem.data.operator}
+                    </Text>
+                  </View>
+                  {sheetDistanceText && (
+                    <View style={styles.sheetInfoChip}>
+                      <MapPin size={13} color={colors.primary} strokeWidth={2} />
+                      <Text style={[styles.sheetInfoText, { color: colors.mutedForeground }]}>
+                        {sheetDistanceText}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.sheetActions}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sheetFavBtn,
+                      {
+                        borderColor: favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.border,
+                        backgroundColor: favouriteIds.has(sheetItem.data.id) ? "#FEF2F2" : colors.muted,
+                        opacity: pressed ? 0.75 : 1,
+                        transform: [{ scale: pressed ? 0.92 : 1 }],
+                      },
+                    ]}
+                    onPress={() => toggleFavourite(sheetItem.data.id)}
+                  >
+                    <Heart
+                      size={20}
+                      color={favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.mutedForeground}
+                      strokeWidth={2}
+                      fill={favouriteIds.has(sheetItem.data.id) ? "#EF4444" : "none"}
+                    />
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sheetBtn,
+                      { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] },
+                    ]}
+                    onPress={() => handleNavigate(sheetItem.data.lat, sheetItem.data.lng, lang === "bg" ? sheetItem.data.name : sheetItem.data.nameEn)}
+                  >
+                    <Navigation size={16} color="white" strokeWidth={2} />
+                    <Text style={[styles.sheetBtnText, { color: "white" }]}>{t("navigateBtn")}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* ---- Official penalty parking sheet ---- */}
+            {sheetItem.type === "officialPenalty" && (
+              <View style={styles.sheetContent}>
+                <View style={styles.sheetHeader}>
+                  <Text style={[styles.sheetName, { color: colors.foreground }]} numberOfLines={2}>
+                    ⚠️ {lang === "bg" ? t("officialPenaltyName") : "Official Penalty Parking"}
+                  </Text>
+                  <View style={[styles.zoneBadge, { backgroundColor: "#FEF2F2", borderColor: "rgba(239,68,68,0.35)" }]}>
+                    <Text style={[styles.zoneBadgeText, { color: "#EF4444" }]}>
+                      {lang === "bg" ? "Постоянен" : "Permanent"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.sheetInfoRow}>
+                  <View style={styles.sheetInfoChip}>
+                    <Text style={[styles.sheetInfoText, { color: colors.mutedForeground }]}>
+                      🏛 {t("operatorLabel")}: {sheetItem.data.operator}
+                    </Text>
+                  </View>
+                  <View style={styles.sheetInfoChip}>
+                    <Text style={[styles.sheetInfoText, { color: colors.mutedForeground }]}>
+                      ℹ️ {t("officialPenaltyInfo")}
+                    </Text>
+                  </View>
+                  {sheetDistanceText && (
+                    <View style={styles.sheetInfoChip}>
+                      <MapPin size={13} color={colors.primary} strokeWidth={2} />
+                      <Text style={[styles.sheetInfoText, { color: colors.mutedForeground }]}>
+                        {sheetDistanceText}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.sheetActions}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.sheetBtn,
+                      { backgroundColor: "#EF4444", opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] },
+                    ]}
+                    onPress={() => handleNavigate(sheetItem.data.lat, sheetItem.data.lng, t("officialPenaltyName"))}
+                  >
+                    <Navigation size={16} color="white" strokeWidth={2} />
+                    <Text style={[styles.sheetBtnText, { color: "white" }]}>{t("navigateBtn")}</Text>
+                  </Pressable>
                 </View>
               </View>
             )}
@@ -2369,6 +2586,34 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   penaltyModeText: { fontSize: 12, fontWeight: "600" },
+  officialPenaltyFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  officialPenaltyDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#EF4444",
+    borderWidth: 1.5,
+    borderColor: "white",
+    shadowColor: "#EF4444",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  alwaysVisibleBadge: {
+    backgroundColor: "#FEF2F2",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.3)",
+  },
+  alwaysVisibleText: { fontSize: 10, fontWeight: "700", color: "#EF4444" },
 
   // Custom map controls
   mapControlsGroup: {

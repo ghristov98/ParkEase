@@ -1,0 +1,139 @@
+1. Add Paid Parking Locations
+Create a new file src/data/municipalParkings.js with this data:
+javascriptexport const municipalParkings = [
+  {
+    id: "parking_1",
+    name: "Паркинг: България",
+    nameEn: "Parking: Bulgaria",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.492645,
+    lng: 27.473731
+  },
+  {
+    id: "parking_2",
+    name: "Паркинг: Опера",
+    nameEn: "Parking: Opera",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.493731,
+    lng: 27.468861
+  },
+  {
+    id: "parking_3",
+    name: "Паркинг: БСУ",
+    nameEn: "Parking: BSU",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.498896,
+    lng: 27.471625
+  },
+  {
+    id: "parking_4",
+    name: "Паркинг: Гурко",
+    nameEn: "Parking: Gurko",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.500184,
+    lng: 27.476196
+  },
+  {
+    id: "parking_5",
+    name: "Паркинг: Пиргос",
+    nameEn: "Parking: Pirgos",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.506257,
+    lng: 27.480016
+  },
+  {
+    id: "parking_6",
+    name: "Паркинг: Изгрев - 39 блок",
+    nameEn: "Parking: Izgrev - Block 39",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.525493,
+    lng: 27.467364
+  },
+  {
+    id: "parking_7",
+    name: "Паркинг: Изгрев - 7 блок",
+    nameEn: "Parking: Izgrev - Block 7",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.528288,
+    lng: 27.456386
+  },
+  {
+    id: "parking_8",
+    name: "Паркинг: С3 Младост",
+    nameEn: "Parking: S3 Mladost",
+    type: "paid",
+    operator: "Общинско Предприятие Транспорт",
+    lat: 42.518103,
+    lng: 27.457878
+  }
+]
+
+Render each as a paid parking marker on the map using the existing/updated paid parking marker style (blue rounded rectangle with white P)
+These markers appear only when the "Paid Parking" filter toggle is active
+When tapped, open the bottom sheet showing: name, operator, type (Платен паркинг / Paid Parking), Navigate button, Favourite button
+Wrap marker rendering in React.memo and use useMemo for the filtered marker array
+
+
+2. Move Language Toggle to Account Settings
+
+Remove the language toggle from the Map Filters panel entirely — close the gap cleanly, no leftover empty space
+Add the language toggle to the Profile / Account Settings page under a "Preferences" / "Предпочитания" section:
+
+Left side: 🌐 globe icon + label "Language / Език"
+Right side: segmented control showing 🇧🇬 Bulgarian and 🇬🇧 English
+Active language is visually highlighted
+
+
+Changing the language applies instantly across the entire app — same behaviour as before, just triggered from the new location
+Language preference must still persist in localStorage or the existing user preferences storage
+Do not break any existing i18n logic
+
+
+3. Add the Official Penalty Marker
+Add this as a single, permanent, fixed marker to municipalParkings.js:
+javascript{
+  id: "penalty_official",
+  name: "Наказателен паркинг",
+  nameEn: "Official Penalty Parking",
+  type: "penalty_official",
+  operator: "Общинско Предприятие Транспорт",
+  lat: 42.500415,
+  lng: 27.474554,
+  permanent: true
+}
+Marker design:
+
+Red circle SVG marker with a white ⚠ icon centered inside
+Slightly larger than the paid parking markers
+Subtle pulsing red glow animation (CSS only)
+White ring border around the circle
+Rendered with the highest zIndex so it always appears above other markers
+
+Behaviour:
+
+Always visible to all users — cannot be hidden by any filter toggle
+Cannot be moved, edited, or deleted by anyone, including super admin
+In the filter panel, show a non-toggleable row with a red dot + label + "Винаги видим / Always visible" badge instead of a switch
+When tapped, open the bottom sheet showing:
+
+⚠️ Name: Наказателен паркинг / Official Penalty Parking
+🏛 Operator: Общинско Предприятие Транспорт
+ℹ️ Info: "Официален общински наказателен паркинг" / "Official municipal impound lot"
+🧭 Navigate button
+
+
+
+
+4. General Requirements
+
+Do not break any existing functionality — map, zones, markers, auth, roles, sessions, filters, navigation
+Both languages (Bulgarian and English) must be supported for all new text via the existing i18n system — no hardcoded strings
+Fully responsive — desktop and mobile
+Ask for these files before touching them: map component, filter panel component, Profile/Settings page component, i18n translation files
