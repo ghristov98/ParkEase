@@ -299,29 +299,113 @@ const PenaltyMarkerSvg = React.memo(() => (
   </Svg>
 ));
 
-// Blue rounded-rectangle with white "P" — municipal paid parking
-// Canvas is larger than the visible shape so stroke/shadow never clips
+// ---------------------------------------------------------------------------
+// Paid Parking (Blue P) — exact geometry from design spec
+// ---------------------------------------------------------------------------
 const MunicipalParkingSvgMarker = React.memo(() => (
-  <Svg width={44} height={54} viewBox="0 0 44 54" style={{ overflow: "visible" }}>
-    <Rect x={4} y={3} width={36} height={36} rx={8} ry={8} fill="#3B5BDB" stroke="#2F4BC4" strokeWidth={2} />
-    <SvgText x={22} y={28} textAnchor="middle" fontSize={20} fontWeight="bold" fill="white">
-      P
-    </SvgText>
-    <SvgPolygon points="16,37 28,37 22,52" fill="#3B5BDB" />
-  </Svg>
+  // 4px padding gives drop-shadow / stroke room without clipping
+  <View style={{ padding: 4, alignItems: "center" }}>
+    <Svg
+      width={40}
+      height={52}
+      viewBox="0 0 40 52"
+      style={{ overflow: "visible" }}
+    >
+      {/* Rounded rectangle body */}
+      <Rect
+        x={2} y={2} width={36} height={36} rx={8} ry={8}
+        fill="#1A56DB" stroke="white" strokeWidth={2.5}
+      />
+      {/* Bottom pointer triangle */}
+      <SvgPolygon
+        points="14,36 26,36 20,50"
+        fill="#1A56DB" stroke="white" strokeWidth={2.5} strokeLinejoin="round"
+      />
+      {/* White P letter */}
+      <SvgText
+        x={20} y={28} textAnchor="middle"
+        fontSize={22} fontWeight="bold" fill="white"
+      >
+        P
+      </SvgText>
+    </Svg>
+  </View>
 ));
 
-// Official penalty — red circle with white ⚠, white ring border
-// Smaller radii ensure the ring + stroke never clips at the SVG edge
-const OfficialPenaltySvgMarker = React.memo(() => (
-  <Svg width={50} height={50} viewBox="0 0 50 50" style={{ overflow: "visible" }}>
-    <Circle cx={25} cy={25} r={22} fill="white" />
-    <Circle cx={25} cy={25} r={19} fill="#EF4444" />
-    <SvgText x={25} y={33} textAnchor="middle" fontSize={21} fill="white" fontWeight="bold">
-      ⚠
-    </SvgText>
-  </Svg>
-));
+// ---------------------------------------------------------------------------
+// Official Penalty — red circle + pulsing ring + "⚠ Наказателен" label
+// ---------------------------------------------------------------------------
+const OfficialPenaltySvgMarker = React.memo(() => {
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(0.65)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.parallel([
+        Animated.timing(pulseScale, {
+          toValue: 1.55,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseOpacity, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  return (
+    <View style={{ alignItems: "center" }}>
+      {/* 78×78 container so the scaled ring never clips the parent View */}
+      <View style={{ width: 78, height: 78, alignItems: "center", justifyContent: "center" }}>
+        {/* Pulsing border ring */}
+        <Animated.View
+          style={{
+            position: "absolute",
+            width: 52,
+            height: 52,
+            borderRadius: 26,
+            borderWidth: 3,
+            borderColor: "#E02424",
+            transform: [{ scale: pulseScale }],
+            opacity: pulseOpacity,
+          }}
+        />
+        {/* Static SVG — exactly matches the web design geometry */}
+        <Svg width={56} height={56} viewBox="0 0 56 56">
+          {/* White outer ring */}
+          <Circle cx={28} cy={28} r={22} fill="white" />
+          {/* Red main circle */}
+          <Circle cx={28} cy={28} r={19} fill="#E02424" />
+          {/* White warning triangle */}
+          <SvgPolygon points="28,14 42,38 14,38" fill="white" opacity={0.95} />
+          {/* Exclamation bar */}
+          <Rect x={26.5} y={20} width={3} height={11} rx={1.5} fill="#E02424" />
+          {/* Exclamation dot */}
+          <Circle cx={28} cy={34} r={1.8} fill="#E02424" />
+        </Svg>
+      </View>
+      {/* Label below marker */}
+      <View
+        style={{
+          marginTop: 2,
+          backgroundColor: "#E02424",
+          borderRadius: 4,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+        }}
+      >
+        <Text style={{ color: "white", fontSize: 9, fontWeight: "bold", fontFamily: "System" }}>
+          ⚠ Наказателен
+        </Text>
+      </View>
+    </View>
+  );
+});
 
 const VehicleSvgMarker = React.memo(({ primaryColor }: { primaryColor: string }) => (
   <Svg width={44} height={44} viewBox="0 0 44 44">
@@ -419,34 +503,16 @@ const MunicipalParkingMarkerComponent = React.memo(
 );
 
 const OfficialPenaltyMarkerComponent = React.memo(
-  ({ onPress }: { onPress: () => void }) => {
-    const pulseAnim = useRef(new Animated.Value(0.85)).current;
-    useEffect(() => {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.15, duration: 900, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 0.85, duration: 900, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-      return () => loop.stop();
-    }, []);
-    return (
-      <Marker
-        coordinate={{ latitude: OFFICIAL_PENALTY.lat, longitude: OFFICIAL_PENALTY.lng }}
-        onPress={onPress}
-        anchor={{ x: 0.5, y: 0.5 }}
-        zIndex={999}
-      >
-        {/* Padding wrapper gives the scaled animation room to breathe without clipping */}
-        <View style={{ padding: 14, alignItems: "center", justifyContent: "center" }}>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <OfficialPenaltySvgMarker />
-          </Animated.View>
-        </View>
-      </Marker>
-    );
-  }
+  ({ onPress }: { onPress: () => void }) => (
+    <Marker
+      coordinate={{ latitude: OFFICIAL_PENALTY.lat, longitude: OFFICIAL_PENALTY.lng }}
+      onPress={onPress}
+      anchor={{ x: 0.5, y: 0.45 }}
+      zIndex={999}
+    >
+      <OfficialPenaltySvgMarker />
+    </Marker>
+  )
 );
 
 // ---------------------------------------------------------------------------
