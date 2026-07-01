@@ -1,0 +1,232 @@
+The parking marker icons are still broken and the penalty parking marker is extremely small. Stop trying to patch the existing marker code. Replace all marker icon code entirely with the exact SVG code provided below.
+
+1. Paid Parking Marker — Replace With This Exact SVG
+Create a new file src/components/markers/PaidParkingMarker.jsx and use this exact SVG:
+jsximport { useCallback } from "react";
+import { OverlayView } from "@react-google-maps/api";
+
+export default function PaidParkingMarker({ parking, onClick }) {
+  const getPixelPositionOffset = useCallback(
+    (width, height) => ({ x: -(width / 2), y: -height }),
+    []
+  );
+
+  return (
+    <OverlayView
+      position={{ lat: parking.lat, lng: parking.lng }}
+      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+      getPixelPositionOffset={getPixelPositionOffset}
+    >
+      <div
+        onClick={() => onClick(parking)}
+        style={{ cursor: "pointer", padding: "4px" }}
+      >
+        <svg
+          width="40"
+          height="52"
+          viewBox="0 0 40 52"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ overflow: "visible", display: "block" }}
+        >
+          {/* Drop shadow */}
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.3" />
+          </filter>
+          {/* Main rounded rectangle body */}
+          <rect
+            x="2"
+            y="2"
+            width="36"
+            height="36"
+            rx="8"
+            ry="8"
+            fill="#1A56DB"
+            stroke="white"
+            strokeWidth="2.5"
+            filter="url(#shadow)"
+          />
+          {/* Bottom pointer triangle */}
+          <polygon
+            points="14,36 26,36 20,50"
+            fill="#1A56DB"
+            stroke="white"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+          />
+          {/* White P letter */}
+          <text
+            x="20"
+            y="28"
+            textAnchor="middle"
+            fontSize="22"
+            fontWeight="bold"
+            fontFamily="Arial, sans-serif"
+            fill="white"
+          >
+            P
+          </text>
+        </svg>
+      </div>
+    </OverlayView>
+  );
+}
+
+2. Official Penalty Parking Marker — Replace With This Exact SVG
+Create a new file src/components/markers/PenaltyParkingMarker.jsx and use this exact SVG:
+jsximport { useCallback } from "react";
+import { OverlayView } from "@react-google-maps/api";
+
+export default function PenaltyParkingMarker({ parking, onClick }) {
+  const getPixelPositionOffset = useCallback(
+    (width, height) => ({ x: -(width / 2), y: -(height / 2) }),
+    []
+  );
+
+  return (
+    <OverlayView
+      position={{ lat: parking.lat, lng: parking.lng }}
+      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+      getPixelPositionOffset={getPixelPositionOffset}
+    >
+      <div
+        onClick={() => onClick(parking)}
+        style={{ cursor: "pointer", padding: "8px" }}
+      >
+        <svg
+          width="56"
+          height="56"
+          viewBox="0 0 56 56"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ overflow: "visible", display: "block" }}
+        >
+          <style>{`
+            @keyframes penaltyPulse {
+              0% { r: 24; opacity: 0.6; }
+              100% { r: 32; opacity: 0; }
+            }
+            .pulse-ring {
+              animation: penaltyPulse 1.5s ease-out infinite;
+            }
+          `}</style>
+
+          {/* Pulsing glow ring */}
+          <circle
+            className="pulse-ring"
+            cx="28"
+            cy="28"
+            r="24"
+            fill="none"
+            stroke="#E02424"
+            strokeWidth="3"
+          />
+
+          {/* Drop shadow filter */}
+          <filter id="penaltyShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.4" />
+          </filter>
+
+          {/* White outer ring */}
+          <circle
+            cx="28"
+            cy="28"
+            r="22"
+            fill="white"
+            filter="url(#penaltyShadow)"
+          />
+
+          {/* Red main circle */}
+          <circle
+            cx="28"
+            cy="28"
+            r="19"
+            fill="#E02424"
+          />
+
+          {/* Warning triangle shape */}
+          <polygon
+            points="28,14 42,38 14,38"
+            fill="white"
+            opacity="0.95"
+          />
+
+          {/* Exclamation mark - vertical bar */}
+          <rect
+            x="26.5"
+            y="20"
+            width="3"
+            height="11"
+            rx="1.5"
+            fill="#E02424"
+          />
+
+          {/* Exclamation mark - dot */}
+          <circle
+            cx="28"
+            cy="34"
+            r="1.8"
+            fill="#E02424"
+          />
+        </svg>
+
+        {/* Label below marker */}
+        <div style={{
+          marginTop: "2px",
+          background: "#E02424",
+          color: "white",
+          fontSize: "9px",
+          fontWeight: "bold",
+          fontFamily: "Arial, sans-serif",
+          padding: "2px 5px",
+          borderRadius: "4px",
+          textAlign: "center",
+          whiteSpace: "nowrap",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
+        }}>
+          ⚠ Наказателен
+        </div>
+      </div>
+    </OverlayView>
+  );
+}
+
+3. How to Use These Markers in the Map Component
+In the existing map component, replace however paid parking markers and the penalty marker are currently rendered with these new components:
+jsximport PaidParkingMarker from "./markers/PaidParkingMarker";
+import PenaltyParkingMarker from "./markers/PenaltyParkingMarker";
+
+// Inside the map render, where filters are applied:
+
+{filters.paidParking && municipalParkings
+  .filter(p => p.type === "paid")
+  .map(parking => (
+    <PaidParkingMarker
+      key={parking.id}
+      parking={parking}
+      onClick={handleMarkerClick}
+    />
+  ))
+}
+
+<PenaltyParkingMarker
+  parking={penaltyOfficialLocation}
+  onClick={handleMarkerClick}
+/>
+
+4. Remove All Old Marker Icon Code
+
+Delete or replace any existing icon definitions for paid parking markers — google.maps.Marker with icon URL, SVG string, or PNG path
+Delete or replace the existing penalty parking marker icon definition
+Do not leave any old marker rendering code running alongside the new components — this causes duplicate markers
+
+
+5. Rules
+
+Use OverlayView from @react-google-maps/api for both markers — this gives full control over rendering and prevents clipping
+overflow: visible must be set on every SVG element
+display: block must be set on every SVG element to remove inline spacing
+The padding on the wrapper div gives the glow and shadow room to render without being clipped by the container
+Do not use google.maps.Marker with an icon for these — OverlayView is the correct approach for custom SVG markers that need full rendering control
+Wrap both components in React.memo
+Ask for the existing map component and any existing marker files before making changes

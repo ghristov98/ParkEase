@@ -100,7 +100,6 @@ export default function AdminNotifications() {
         loading={createMutation.isPending}
         fullWidth
         style={{ marginTop: 24 }}
-        icon="📢"
       />
     </ScrollView>
   );
