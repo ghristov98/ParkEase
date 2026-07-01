@@ -300,36 +300,16 @@ const PenaltyMarkerSvg = React.memo(() => (
 ));
 
 // ---------------------------------------------------------------------------
-// Paid Parking (Blue P) — exact geometry from design spec
+// Paid Parking — image-based marker
 // ---------------------------------------------------------------------------
+const PAID_PARKING_IMG = require("../../assets/images/paid-parking-marker.png");
+
 const MunicipalParkingSvgMarker = React.memo(() => (
-  // 4px padding gives drop-shadow / stroke room without clipping
-  <View style={{ padding: 4, alignItems: "center" }}>
-    <Svg
-      width={40}
-      height={52}
-      viewBox="0 0 40 52"
-      style={{ overflow: "visible" }}
-    >
-      {/* Rounded rectangle body */}
-      <Rect
-        x={2} y={2} width={36} height={36} rx={8} ry={8}
-        fill="#1A56DB" stroke="white" strokeWidth={2.5}
-      />
-      {/* Bottom pointer triangle */}
-      <SvgPolygon
-        points="14,36 26,36 20,50"
-        fill="#1A56DB" stroke="white" strokeWidth={2.5} strokeLinejoin="round"
-      />
-      {/* White P letter */}
-      <SvgText
-        x={20} y={28} textAnchor="middle"
-        fontSize={22} fontWeight="bold" fill="white"
-      >
-        P
-      </SvgText>
-    </Svg>
-  </View>
+  <Image
+    source={PAID_PARKING_IMG}
+    style={{ width: 52, height: 52, borderRadius: 12 }}
+    resizeMode="contain"
+  />
 ));
 
 // ---------------------------------------------------------------------------
@@ -493,7 +473,7 @@ const MunicipalParkingMarkerComponent = React.memo(
     <Marker
       coordinate={{ latitude: parking.lat, longitude: parking.lng }}
       onPress={onPress}
-      anchor={{ x: 0.5, y: 1 }}
+      anchor={{ x: 0.5, y: 0.5 }}
     >
       <AnimatedDropMarker>
         <MunicipalParkingSvgMarker />
