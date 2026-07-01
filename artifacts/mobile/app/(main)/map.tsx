@@ -30,6 +30,7 @@ import React, {
 } from "react";
 import {
   Animated,
+  Dimensions,
   Easing,
   FlatList,
   Image,
@@ -299,25 +300,24 @@ const PenaltyMarkerSvg = React.memo(() => (
 ));
 
 // Blue rounded-rectangle with white "P" — municipal paid parking
+// Canvas is larger than the visible shape so stroke/shadow never clips
 const MunicipalParkingSvgMarker = React.memo(() => (
-  <Svg width={38} height={45} viewBox="0 0 38 45">
-    <Rect x={2} y={2} width={34} height={34} rx={7} ry={7} fill="#3B5BDB" stroke="#2F4BC4" strokeWidth={2} />
-    <SvgText x={19} y={25} textAnchor="middle" fontSize={19} fontWeight="bold" fill="white">
+  <Svg width={44} height={54} viewBox="0 0 44 54" style={{ overflow: "visible" }}>
+    <Rect x={4} y={3} width={36} height={36} rx={8} ry={8} fill="#3B5BDB" stroke="#2F4BC4" strokeWidth={2} />
+    <SvgText x={22} y={28} textAnchor="middle" fontSize={20} fontWeight="bold" fill="white">
       P
     </SvgText>
-    <SvgPolygon points="14,34 24,34 19,44" fill="#3B5BDB" />
+    <SvgPolygon points="16,37 28,37 22,52" fill="#3B5BDB" />
   </Svg>
 ));
 
 // Official penalty — red circle with white ⚠, white ring border
+// Smaller radii ensure the ring + stroke never clips at the SVG edge
 const OfficialPenaltySvgMarker = React.memo(() => (
-  <Svg width={50} height={50} viewBox="0 0 50 50">
-    {/* outer white ring */}
-    <Circle cx={25} cy={25} r={24} fill="white" />
-    {/* red fill */}
-    <Circle cx={25} cy={25} r={21} fill="#EF4444" />
-    {/* warning symbol */}
-    <SvgText x={25} y={33} textAnchor="middle" fontSize={24} fill="white" fontWeight="bold">
+  <Svg width={50} height={50} viewBox="0 0 50 50" style={{ overflow: "visible" }}>
+    <Circle cx={25} cy={25} r={22} fill="white" />
+    <Circle cx={25} cy={25} r={19} fill="#EF4444" />
+    <SvgText x={25} y={33} textAnchor="middle" fontSize={21} fill="white" fontWeight="bold">
       ⚠
     </SvgText>
   </Svg>
@@ -438,13 +438,24 @@ const OfficialPenaltyMarkerComponent = React.memo(
         anchor={{ x: 0.5, y: 0.5 }}
         zIndex={999}
       >
-        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <OfficialPenaltySvgMarker />
-        </Animated.View>
+        {/* Padding wrapper gives the scaled animation room to breathe without clipping */}
+        <View style={{ padding: 14, alignItems: "center", justifyContent: "center" }}>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <OfficialPenaltySvgMarker />
+          </Animated.View>
+        </View>
       </Marker>
     );
   }
 );
+
+// ---------------------------------------------------------------------------
+// Sheet geometry — two snap points (collapsed ≈ 38 %, expanded ≈ 75 %)
+// ---------------------------------------------------------------------------
+
+const _SCREEN_H = Dimensions.get("window").height;
+const SHEET_FULL_H = Math.round(_SCREEN_H * 0.75);
+const SHEET_COLLAPSED_OFFSET = Math.round(SHEET_FULL_H - _SCREEN_H * 0.38);
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -482,31 +493,38 @@ export default function MapScreen() {
   const mapRef = useRef<any>(null);
   const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
-  // Sheet animation state
-  const sheetAnim = useRef(new Animated.Value(1)).current; // 0=open 1=closed
+  // Sheet animation — two snap points + closed
+  // sheetSnapAnim holds the actual translateY value directly
+  const sheetSnapAnim = useRef(new Animated.Value(SHEET_FULL_H)).current;
   const sheetPanY = useRef(new Animated.Value(0)).current;
-  const sheetTranslateY = useRef(
-    Animated.add(
-      sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 420] }),
-      sheetPanY
-    )
-  ).current;
+  const sheetTranslateY = useRef(Animated.add(sheetSnapAnim, sheetPanY)).current;
+  const sheetSnapRef = useRef<"collapsed" | "expanded">("collapsed");
+  const [sheetSnap, setSheetSnap] = useState<"collapsed" | "expanded">("collapsed");
 
-  // Stable ref so PanResponder can always call the latest closeSheet
+  // Stable refs so PanResponder can always call the latest functions
   const closeSheetRef = useRef<() => void>(() => {});
+  const snapSheetRef = useRef<(to: "collapsed" | "expanded" | "close") => void>(() => {});
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, g) =>
-        g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+        Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderMove: (_, g) => {
-        if (g.dy > 0) sheetPanY.setValue(g.dy);
+        sheetPanY.setValue(g.dy);
       },
       onPanResponderRelease: (_, g) => {
-        if (g.dy > 80 || g.vy > 0.8) {
-          sheetPanY.setValue(0);
-          closeSheetRef.current();
+        sheetPanY.setValue(0);
+        const swipedDown = g.dy > 80 || g.vy > 0.8;
+        const swipedUp = g.dy < -60 || g.vy < -0.6;
+        if (swipedDown) {
+          if (sheetSnapRef.current === "expanded") {
+            snapSheetRef.current("collapsed");
+          } else {
+            closeSheetRef.current();
+          }
+        } else if (swipedUp && sheetSnapRef.current === "collapsed") {
+          snapSheetRef.current("expanded");
         } else {
           Animated.spring(sheetPanY, {
             toValue: 0,
@@ -553,31 +571,46 @@ export default function MapScreen() {
   const openSheet = useCallback(
     (item: SheetItem) => {
       setSheetItem(item);
-      sheetAnim.setValue(1);
-      Animated.spring(sheetAnim, {
-        toValue: 0,
+      sheetSnapRef.current = "collapsed";
+      setSheetSnap("collapsed");
+      sheetSnapAnim.setValue(SHEET_FULL_H);
+      sheetPanY.setValue(0);
+      Animated.spring(sheetSnapAnim, {
+        toValue: SHEET_COLLAPSED_OFFSET,
         useNativeDriver: true,
         tension: 65,
         friction: 11,
       }).start();
     },
-    [sheetAnim]
+    [sheetSnapAnim, sheetPanY]
   );
 
   const closeSheet = useCallback(() => {
-    Animated.timing(sheetAnim, {
-      toValue: 1,
+    Animated.timing(sheetSnapAnim, {
+      toValue: SHEET_FULL_H,
       duration: 250,
       useNativeDriver: true,
     }).start(() => {
       setSheetItem(null);
       setSelectedZoneId(null);
       sheetPanY.setValue(0);
+      sheetSnapRef.current = "collapsed";
     });
-  }, [sheetAnim, sheetPanY]);
+  }, [sheetSnapAnim, sheetPanY]);
 
   // Keep ref current so PanResponder always calls latest closeSheet
   closeSheetRef.current = closeSheet;
+  snapSheetRef.current = (to) => {
+    if (to === "close") { closeSheet(); return; }
+    sheetSnapRef.current = to;
+    setSheetSnap(to);
+    Animated.spring(sheetSnapAnim, {
+      toValue: to === "expanded" ? 0 : SHEET_COLLAPSED_OFFSET,
+      useNativeDriver: true,
+      tension: 70,
+      friction: 12,
+    }).start();
+  };
 
   // ---------------------------------------------------------------------------
   // Zone pulse animation
@@ -1590,25 +1623,39 @@ export default function MapScreen() {
               styles.sheet,
               {
                 backgroundColor: colors.card,
-                paddingBottom: insets.bottom + 20,
+                height: SHEET_FULL_H,
                 transform: [{ translateY: sheetTranslateY }],
               },
             ]}
-            {...panResponder.panHandlers}
           >
-            {/* Handle bar + close */}
-            <View style={styles.sheetTopRow}>
-              <View style={styles.sheetHandle} />
+            {/* Handle zone — swipe to snap, tap to toggle */}
+            <View {...panResponder.panHandlers} style={styles.sheetHandleZone}>
+              <TouchableOpacity
+                onPress={() => {
+                  const next = sheetSnapRef.current === "collapsed" ? "expanded" : "collapsed";
+                  snapSheetRef.current(next);
+                }}
+                activeOpacity={1}
+                style={styles.sheetTopRow}
+              >
+                <View style={styles.sheetHandle} />
+              </TouchableOpacity>
               <Pressable
                 onPress={closeSheet}
-                style={({ pressed }) => [
-                  styles.sheetCloseBtn,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
+                hitSlop={8}
+                style={({ pressed }) => [styles.sheetCloseBtn, { opacity: pressed ? 0.6 : 1 }]}
               >
                 <X size={18} color={colors.mutedForeground} strokeWidth={2.5} />
               </Pressable>
             </View>
+
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+              scrollEnabled={sheetSnap === "expanded"}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
 
             {/* ---- Parking lot sheet ---- */}
             {sheetItem.type === "lot" && (
@@ -1652,76 +1699,57 @@ export default function MapScreen() {
                   </View>
                 </View>
 
-                <View style={styles.sheetActions}>
-                  {/* Favourite toggle */}
+                <View style={styles.sheetDivider} />
+
+                <View style={styles.sheetActionCol}>
+                  {/* Favourite — full-width outlined */}
                   <Pressable
                     style={({ pressed }) => [
-                      styles.sheetFavBtn,
+                      styles.sheetBtnFull,
                       {
-                        borderColor: favouriteIds.has(sheetItem.data.id)
-                          ? "#EF4444"
-                          : colors.border,
-                        backgroundColor: favouriteIds.has(sheetItem.data.id)
-                          ? "#FEF2F2"
-                          : colors.muted,
+                        borderWidth: 1.5,
+                        borderColor: favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.border,
+                        backgroundColor: favouriteIds.has(sheetItem.data.id) ? "#FEF2F2" : colors.muted,
                         opacity: pressed ? 0.75 : 1,
-                        transform: [{ scale: pressed ? 0.92 : 1 }],
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
                       },
                     ]}
                     onPress={() => toggleFavourite(sheetItem.data.id)}
                   >
                     <Heart
-                      size={20}
-                      color={
-                        favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.mutedForeground
-                      }
+                      size={18}
+                      color={favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.mutedForeground}
                       strokeWidth={2}
                       fill={favouriteIds.has(sheetItem.data.id) ? "#EF4444" : "none"}
                     />
+                    <Text style={[styles.sheetBtnText, { color: favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.foreground }]}>
+                      {favouriteIds.has(sheetItem.data.id) ? "Saved" : "Save to Favourites"}
+                    </Text>
                   </Pressable>
 
-                  {/* Navigate */}
+                  {/* Navigate — full-width filled */}
                   <Pressable
                     style={({ pressed }) => [
-                      styles.sheetBtn,
-                      {
-                        backgroundColor: colors.muted,
-                        borderColor: colors.border,
-                        opacity: pressed ? 0.8 : 1,
-                        transform: [{ scale: pressed ? 0.96 : 1 }],
-                      },
+                      styles.sheetBtnFull,
+                      { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                     ]}
-                    onPress={() =>
-                      handleNavigate(
-                        sheetItem.data.latitude,
-                        sheetItem.data.longitude,
-                        sheetItem.data.name
-                      )
-                    }
+                    onPress={() => handleNavigate(sheetItem.data.latitude, sheetItem.data.longitude, sheetItem.data.name)}
                   >
-                    <Navigation size={16} color={colors.foreground} strokeWidth={2} />
-                    <Text style={[styles.sheetBtnText, { color: colors.foreground }]}>
-                      Navigate
-                    </Text>
+                    <Navigation size={16} color="white" strokeWidth={2} />
+                    <Text style={[styles.sheetBtnText, { color: "white" }]}>Navigate</Text>
                   </Pressable>
 
                   {/* Start Session */}
                   {!isSuperAdmin && (
                     <Pressable
                       style={({ pressed }) => [
-                        styles.sheetBtn,
-                        {
-                          backgroundColor: colors.primary,
-                          opacity: pressed ? 0.85 : 1,
-                          transform: [{ scale: pressed ? 0.96 : 1 }],
-                        },
+                        styles.sheetBtnFull,
+                        { backgroundColor: "#16A34A", opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                       ]}
                       onPress={() => router.push(`/parking/${sheetItem.data.id}`)}
                     >
                       <PlayCircle size={16} color="white" strokeWidth={2} />
-                      <Text style={[styles.sheetBtnText, { color: "white" }]}>
-                        Start Session
-                      </Text>
+                      <Text style={[styles.sheetBtnText, { color: "white" }]}>Start Session</Text>
                     </Pressable>
                   )}
 
@@ -1729,18 +1757,12 @@ export default function MapScreen() {
                   {isSuperAdmin && (
                     <Pressable
                       style={({ pressed }) => [
-                        styles.sheetBtn,
-                        {
-                          backgroundColor: colors.primary,
-                          opacity: pressed ? 0.85 : 1,
-                          transform: [{ scale: pressed ? 0.96 : 1 }],
-                        },
+                        styles.sheetBtnFull,
+                        { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                       ]}
                       onPress={() => router.push(`/parking/${sheetItem.data.id}`)}
                     >
-                      <Text style={[styles.sheetBtnText, { color: "white" }]}>
-                        View Details →
-                      </Text>
+                      <Text style={[styles.sheetBtnText, { color: "white" }]}>View Details →</Text>
                     </Pressable>
                   )}
                 </View>
@@ -1775,30 +1797,36 @@ export default function MapScreen() {
                     </View>
                   )}
                 </View>
-                <View style={styles.sheetActions}>
+                <View style={styles.sheetDivider} />
+
+                <View style={styles.sheetActionCol}>
                   <Pressable
                     style={({ pressed }) => [
-                      styles.sheetFavBtn,
+                      styles.sheetBtnFull,
                       {
+                        borderWidth: 1.5,
                         borderColor: favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.border,
                         backgroundColor: favouriteIds.has(sheetItem.data.id) ? "#FEF2F2" : colors.muted,
                         opacity: pressed ? 0.75 : 1,
-                        transform: [{ scale: pressed ? 0.92 : 1 }],
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
                       },
                     ]}
                     onPress={() => toggleFavourite(sheetItem.data.id)}
                   >
                     <Heart
-                      size={20}
+                      size={18}
                       color={favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.mutedForeground}
                       strokeWidth={2}
                       fill={favouriteIds.has(sheetItem.data.id) ? "#EF4444" : "none"}
                     />
+                    <Text style={[styles.sheetBtnText, { color: favouriteIds.has(sheetItem.data.id) ? "#EF4444" : colors.foreground }]}>
+                      {favouriteIds.has(sheetItem.data.id) ? "Saved" : "Save to Favourites"}
+                    </Text>
                   </Pressable>
                   <Pressable
                     style={({ pressed }) => [
-                      styles.sheetBtn,
-                      { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] },
+                      styles.sheetBtnFull,
+                      { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                     ]}
                     onPress={() => handleNavigate(sheetItem.data.lat, sheetItem.data.lng, lang === "bg" ? sheetItem.data.name : sheetItem.data.nameEn)}
                   >
@@ -1842,11 +1870,13 @@ export default function MapScreen() {
                     </View>
                   )}
                 </View>
-                <View style={styles.sheetActions}>
+                <View style={styles.sheetDivider} />
+
+                <View style={styles.sheetActionCol}>
                   <Pressable
                     style={({ pressed }) => [
-                      styles.sheetBtn,
-                      { backgroundColor: "#EF4444", opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] },
+                      styles.sheetBtnFull,
+                      { backgroundColor: "#EF4444", opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                     ]}
                     onPress={() => handleNavigate(sheetItem.data.lat, sheetItem.data.lng, t("officialPenaltyName"))}
                   >
@@ -1952,56 +1982,47 @@ export default function MapScreen() {
                   )}
                 </View>
 
-                <View style={styles.sheetActions}>
+                <View style={styles.sheetDivider} />
+
+                <View style={styles.sheetActionCol}>
                   {/* Navigate to zone */}
                   <Pressable
                     style={({ pressed }) => [
-                      styles.sheetBtn,
+                      styles.sheetBtnFull,
                       {
-                        backgroundColor: colors.muted,
+                        borderWidth: 1.5,
                         borderColor: colors.border,
+                        backgroundColor: colors.muted,
                         opacity: pressed ? 0.8 : 1,
-                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
                       },
                     ]}
                     onPress={() =>
                       handleNavigate(
                         sheetItem.data.coord.latitude,
                         sheetItem.data.coord.longitude,
-                        sheetItem.data.zone.type === "blue"
-                          ? "Blue Parking Zone"
-                          : "Green Parking Zone"
+                        sheetItem.data.zone.type === "blue" ? "Blue Parking Zone" : "Green Parking Zone"
                       )
                     }
                   >
                     <Navigation size={16} color={colors.foreground} strokeWidth={2} />
-                    <Text style={[styles.sheetBtnText, { color: colors.foreground }]}>
-                      Navigate
-                    </Text>
+                    <Text style={[styles.sheetBtnText, { color: colors.foreground }]}>Navigate</Text>
                   </Pressable>
 
                   {/* Show nearby machines */}
                   <Pressable
                     style={({ pressed }) => [
-                      styles.sheetBtn,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: pressed ? 0.85 : 1,
-                        transform: [{ scale: pressed ? 0.96 : 1 }],
-                      },
+                      styles.sheetBtnFull,
+                      { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
                     ]}
-                    onPress={() => {
-                      setNearbyMachinesCoord(sheetItem.data.coord);
-                      closeSheet();
-                    }}
+                    onPress={() => { setNearbyMachinesCoord(sheetItem.data.coord); closeSheet(); }}
                   >
-                    <Text style={[styles.sheetBtnText, { color: "white" }]}>
-                      💲 Nearby Machines
-                    </Text>
+                    <Text style={[styles.sheetBtnText, { color: "white" }]}>💲 Nearby Machines</Text>
                   </Pressable>
                 </View>
               </View>
             )}
+            </ScrollView>
           </Animated.View>
         </>
       )}
@@ -2763,18 +2784,26 @@ const styles = StyleSheet.create({
     zIndex: 25,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingTop: 10,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.13,
     shadowRadius: 14,
     elevation: 18,
   },
+  // Handle zone: pan + tap target at top of sheet
+  sheetHandleZone: {
+    paddingTop: 10,
+    paddingBottom: 6,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    position: "relative",
+    zIndex: 1,
+  },
   sheetTopRow: {
     alignItems: "center",
-    marginBottom: 4,
-    paddingHorizontal: 16,
-    position: "relative",
+    paddingVertical: 4,
+    width: "100%",
   },
   sheetHandle: {
     width: 40,
@@ -2785,14 +2814,16 @@ const styles = StyleSheet.create({
   },
   sheetCloseBtn: {
     position: "absolute",
-    right: 16,
-    top: -6,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    right: 0,
+    top: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
+  // Scrollable content area
+  sheetScroll: { flex: 1 },
   sheetContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   sheetHeader: {
     flexDirection: "row",
@@ -2807,7 +2838,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   sheetInfoChip: {
     flexDirection: "row",
@@ -2819,11 +2850,28 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   sheetInfoText: { fontSize: 12, fontWeight: "500" },
-  sheetActions: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
+  // Divider between info and actions
+  sheetDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 20,
+    marginBottom: 14,
   },
+  // Vertical stacked full-width action buttons
+  sheetActionCol: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  sheetBtnFull: {
+    height: 50,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    borderWidth: 0,
+  },
+  // Kept for backward compat (zone/penalty still use sheetBtn in some spots)
   sheetBtn: {
     flex: 1,
     height: 46,

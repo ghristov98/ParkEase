@@ -1,0 +1,101 @@
+1. Fix Parking Marker Icons Being Cut Off
+Looking at the screenshot, the paid parking markers (blue P) and the penalty parking marker (red ⚠) are visibly cut off and not fully rendered on the map.
+Fix the following:
+
+The marker SVG viewBox and container dimensions must fully contain the entire marker shape including the bottom pointer triangle and any glow/shadow effects
+Do not clip the SVG — make sure overflow: visible is set on the SVG element so nothing gets cut off at the edges
+The Google Maps marker anchor point must be set correctly — the anchor should be at the bottom centre of the pointer triangle, not at the top-left corner of the SVG bounding box. Set the anchor like this:
+
+javascriptanchor: new google.maps.Point(width / 2, height)
+
+Make sure the marker container div has enough padding around the SVG to prevent any shadow, glow, or border from being clipped
+The penalty parking marker pulsing glow animation must also be fully visible — increase the SVG canvas size to accommodate the glow radius without clipping
+Test at multiple zoom levels — markers must be fully visible and crisp at all zoom levels
+
+Specific fixes per marker type:
+Paid parking markers (blue rounded rectangle with white P):
+
+Increase the SVG height to include the bottom pointer triangle fully
+Make sure the rounded rectangle body + triangle pointer are all within the viewBox bounds
+Add 4px padding inside the SVG canvas on all sides to prevent border clipping
+
+Official penalty parking marker (red circle with ⚠):
+
+Increase the SVG canvas size to at least 1.5× the circle diameter to give the pulsing glow room to animate without clipping
+Make sure the white ring border is fully visible
+The ⚠ icon must be fully centered and not cropped
+
+
+2. Fix the Bottom Sheet — Cannot Expand or Scroll
+Looking at the screenshot, the bottom sheet that opens when a parking or zone is tapped is stuck at a small fixed height. The "Navigate" button is partially hidden and the user cannot expand or scroll the panel to see all content.
+Fix the following:
+Expandable bottom sheet:
+
+The bottom sheet must have two snap points:
+
+Collapsed state — shows the title, type badge, and operator — approximately 35% of screen height
+Expanded state — shows all content including Navigate button, Favourite button, parking details, and any additional info — approximately 75% of screen height
+
+
+The user can switch between states by:
+
+Tapping the drag handle at the top of the sheet
+Swiping the sheet upward to expand
+Swiping the sheet downward to collapse
+Swiping further down from collapsed state closes the sheet entirely
+
+
+
+Content inside the bottom sheet must always be fully visible:
+
+All content must be scrollable inside the sheet when in expanded state
+The Navigate button must always be fully visible — never hidden or cut off
+The Favourite button must always be fully visible
+Add a visible drag handle (short grey rounded bar) at the very top centre of the sheet
+The X close button must always be visible in the top-right corner regardless of snap state
+
+Bottom sheet content layout for paid parkings:
+
+Title: parking name (large, bold)
+Type badge: "Paid Parking" pill (blue background)
+Operator row: 🏛 Operator name
+Divider
+⭐ Favourite button (outlined, full width)
+🧭 Navigate button (filled blue, full width)
+
+Bottom sheet content layout for official penalty parking:
+
+Title: Наказателен паркинг / Official Penalty Parking (large, bold)
+Type badge: "Official" pill (red background)
+Operator row: 🏛 Общинско Предприятие Транспорт
+Info row: ℹ️ "Официален общински наказателен паркинг" / "Official municipal impound lot"
+Divider
+🧭 Navigate button (filled red, full width)
+
+Bottom sheet content layout for zones (Blue Zone / Green Zone):
+
+Title: zone name
+Type badge: colored pill matching zone color
+Info about the zone (working hours, price per hour if available)
+🧭 Navigate to nearest parking in this zone button
+
+Animation:
+
+Sheet slides up smoothly when opening — 300ms ease-out
+Sheet snaps between collapsed and expanded states — 200ms ease
+Sheet slides down when dismissed — 250ms ease-in
+Background map remains fully interactive while the sheet is in collapsed state
+In expanded state, block map interaction behind the sheet only
+
+Z-index:
+
+Bottom sheet must always render above all map markers, filter button, and map controls
+Bottom sheet must render below the bottom navigation bar — never cover the nav bar
+
+
+3. General Requirements
+
+Do not break any existing functionality — map, zones, markers, filters, navigation, auth
+Fully responsive — fixes must work on both mobile and desktop
+All animations CSS only — no new animation libraries
+Ask for the map component, marker components, and bottom sheet component before making any changes
